@@ -144,8 +144,50 @@ ROPE_POSITIONS = 1 << 21
 ROPE_THETA = 500_000.0
 
 
+@triton.jit
+def _dense_partials(X, W, P, M: tl.constexpr, N: tl.constexpr, K: tl.constexpr,
+                    BM: tl.constexpr, BN: tl.constexpr, BK: tl.constexpr,
+                    SPLIT: tl.constexpr):
+    mi = tl.program_id(0) * BM + tl.arange(0, BM)
+    ni = tl.program_id(1) * BN + tl.arange(0, BN)
+    split = tl.program_id(2)
+    ki = split * (K // SPLIT) + tl.arange(0, BK)
+    acc = tl.full((BM, BN), 0, tl.float32)
+    for step in range(K // SPLIT // BK):
+        kk = ki + step * BK
+        a = tl.load(X + mi[:, None] * K + kk[None, :], mi[:, None] < M, other=0)
+        b = tl.load(W + ni[None, :] * K + kk[:, None], ni[None, :] < N, other=0)
+        acc += tl.dot(a, b)
+    tl.store(P + split * M * N + mi[:, None] * N + ni[None, :],
+             acc, (mi[:, None] < M) & (ni[None, :] < N))
+
+
+@triton.jit
+def _dense_reduce(P, O, SIZE: tl.constexpr, SPLIT: tl.constexpr,
+                  BLOCK: tl.constexpr):
+    i = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    s = tl.arange(0, SPLIT)
+    partial = tl.load(P + s[:, None] * SIZE + i[None, :], i[None, :] < SIZE, other=0)
+    tl.store(O + i, tl.sum(partial, axis=0), i < SIZE)
+
+
 def _gemm(x, w):
-    return _bf16_gemm_dispatch_impl(x, w, None)
+    m, k = x.shape
+    n = w.shape[0]
+    if m > 8:
+        return _bf16_gemm_dispatch_impl(x, w, None)
+    # Static shape dispatch; all scratch tensors are fully overwritten per call.
+    # The input and weight stay BF16. Both the dot products and split reduction
+    # accumulate in FP32, with one final BF16 output conversion.
+    split = 8 if k >= 4096 else 4
+    bm = 16 if m <= 16 else 32
+    partial = torch.empty((split, m, n), device=x.device, dtype=torch.float32)
+    out = torch.empty((m, n), device=x.device, dtype=torch.bfloat16)
+    _dense_partials[(triton.cdiv(m, bm), triton.cdiv(n, 64), split)](
+        x, w, partial, m, n, k, bm, 64, 128, split, num_warps=4, num_stages=2)
+    _dense_reduce[(triton.cdiv(m * n, 256),)](
+        partial, out, m * n, split, 256, num_warps=4)
+    return out
 
 
 def _param(w):
@@ -226,6 +268,7 @@ def prepare(weights):
         "pre_expert_norm": _norm(MuseSpark1xRMSNorm, weights["pre_expert_norm"], D_EXPERT, RMS_EPS),
         # MuseSpark1xFp4Experts binds the post-expert norm's effective (1 + w) weight.
         "post_expert_w": post_expert._get_effective_weight().detach().to(torch.bfloat16),
+        "pre_expert_w": (weights["pre_expert_norm"] + 1).contiguous(),
         "bank": _marlin_bank(weights),
         "side_stream": torch.cuda.Stream(device),
         "_modules": (pre_ffn, next_pre_attn, post_attn, post_ffn, post_expert),
@@ -241,10 +284,9 @@ def _experts(x, topk_weights, topk_ids, state):
     num_tokens, size_k = x.shape
     size_n = bank["size_n"]
     gemm1_n = 2 * size_n
-    local_ids = bank["expert_map"][topk_ids].contiguous()
+    local_ids = topk_ids
     topk_weights = topk_weights.to(torch.float32).contiguous()
-    # Smaller route tiles limit padding work for uneven expert loads and expose
-    # more independent blocks. Keep all routes and the original Marlin precision.
+    # Route tiles measured in attempt 3, preserving every route.
     block_size_m = 8 if num_tokens <= 16 else 16
     sorted_ids, block_experts, n_padded = moe_align_block_size(local_ids, block_size_m, N_EXPERTS)
     cache2 = torch.empty((num_tokens * TOP_K, size_n), device=x.device, dtype=x.dtype)
@@ -267,6 +309,30 @@ def _experts(x, topk_weights, topk_ids, state):
     return fused_post_expert_norm_weighted_sum(
         y, topk_weights, norm_weight=state["post_expert_w"], eps=POST_NORM_EPS, weight_first=True,
         slot_expert_ids=local_ids)
+
+
+@triton.jit
+def _norm_and_local_routes(X, W, TOP, START, Y, IDS):
+    token = tl.program_id(0)
+    col = tl.arange(0, 4096)
+    x = tl.load(X + token * 4096 + col).to(tl.float32)
+    weight = tl.load(W + col).to(tl.float32)
+    rstd = tl.rsqrt(tl.sum(x * x, 0) / 4096 + 1.0e-5)
+    tl.store(Y + token * 4096 + col, x * rstd * weight)
+    slot = tl.arange(0, 8)
+    expert = tl.load(TOP + token * 8 + slot).to(tl.int32)
+    start = tl.load(START).to(tl.int32)
+    local = (expert - start) & 255
+    tl.store(IDS + token * 8 + slot, tl.where(local < 32, local, -1))
+
+
+def _expert_input_and_ids(x, topk_ids, local_start, state):
+    y = torch.empty_like(x)
+    ids = torch.empty(topk_ids.shape, device=x.device, dtype=torch.int32)
+    _norm_and_local_routes[(x.shape[0],)](
+        x, state["pre_expert_w"], topk_ids, local_start, y, ids,
+        num_warps=4, enable_fp_fusion=False)
+    return y, ids
 
 
 @triton.jit
@@ -369,9 +435,10 @@ def kernel_fn(data, state):
         for tensor in (topk_weights, topk_ids):
             tensor.record_stream(main_stream)
     # This GPU's experts start at local_start: as SGLang's expert_map on that EP rank.
-    local_ids = (topk_ids - data["local_start"]) % N_EXPERTS
+    expert_input, local_ids = _expert_input_and_ids(
+        expert_input, topk_ids, data["local_start"], state)
     # all-reduce: identity
-    expert_output = _experts(state["pre_expert_norm"](expert_input), topk_weights, local_ids, state)
+    expert_output = _experts(expert_input, topk_weights, local_ids, state)
     if tokens <= SLICED_UNPOOL_MAX_TOKENS:
         unpooled = _gemm(expert_output, dense["unpooler"][:UNPOOL_SLICE])
         ffn_output = F.pad(unpooled, (0, HIDDEN - UNPOOL_SLICE))  # all-gather: identity

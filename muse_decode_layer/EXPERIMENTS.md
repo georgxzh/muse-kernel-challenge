@@ -104,3 +104,30 @@ correctness or performance result.
   FP32; expert input BF16. Local syntax passed; not checked yet.
 - Source reviewed for norm precision:
   https://github.com/sgl-project/sglang/blob/a55ab7d5ae1bba59ac351e55026fe7f7644ecc5f/python/sglang/srt/layers/muse_spark_layers.py
+
+## Attempt 4: combine measured winners and fuse expert preparation
+
+- File: candidate_combined.py; promoted exact checked source to submission.py.
+- QK/cache fusion + attempt 3 expert tiles + split-K projections restricted to
+  T<=8, where attempt 2 won. T=16/32 use SGLang dispatch to avoid regressions.
+- Adds the prepared pre-expert norm/local-route mapping fusion described above.
+- All weight/activation precision, FP32 sums, route weights and keys preserved.
+- Local ast.parse passed. Check 4a37347009d24582: PASS, 13/13 tests, no flags.
+- Speedup 1.1134628x; 95% CI [1.0967609, 1.1301648]; score 20315.2719 us.
+- Source SHA256: d60e7ef0aaf3274f249489dce37611e096adb29908827e2e87f4329fe8e07935.
+- Profile: profiles/candidate_combined.4a37347009d24582.txt.
+- All 12 timed shapes improve: 1.026-1.236x.
+- Decision: promote and recommend immediate submit, pending user approval.
+- Fourth check today; 6 remain, including 2 reserved. Three scored runs remain.
+
+## Approved scored entry for attempt 3
+
+- User approved attempt 3, then explicitly approved one retry after HTTP/2
+  protocol errors. The failed POST did not appear in jobs or consume quota.
+- Accepted job acf0293fff4c4d60: PASS, 13/13 tests, no flags.
+- Scored speedup 1.0590949x; 95% CI [1.0432085, 1.0749813].
+- Profile: profiles/submission.acf0293fff4c4d60.txt.
+- HTTP/2 also failed the first attempt-4 check POST without consuming quota.
+  Subsequent CLI calls use per-process GODEBUG=http2client=0 (HTTP/1.1),
+  with no global configuration change.
+- Completed attempts 1-4 have each been committed with results and pushed.
