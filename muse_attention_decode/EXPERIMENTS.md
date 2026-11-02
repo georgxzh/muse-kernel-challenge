@@ -56,3 +56,35 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   layers and on full decode only when batch >= 8; dispatch uses public shapes.
 - Initial scored entry is live and correct. 1 of 5 scored runs used today;
   each additional scored submit still requires fresh user approval.
+
+## Attempt 3 — custom sliding plus measured full-decode dispatch
+
+- File: `candidates/attempt03_split_all.py`.
+- Reuse the validated stable chunk/combine algorithm for the complete sliding
+  window. Include the block's full union of windows, then apply each query's
+  exact window and causal masks. Fused combine/gate removes FA3 scheduling and
+  separate output launches on this path.
+- Use custom full attention only for decode with batch >= 8, where attempt 2's
+  profile showed a gain. Full verify and small-batch full decode retain FA3.
+- Offline SM90 compilation passes, including sliding verify and long combine.
+- Remote check `8527a083c2844c23`: PASS 16/16; 1.27569792x, 95% CI [1.25656246, 1.30073351], score 2952.345 us. Promoted unchanged to submission.py.
+
+## Draft 4 — grouped preparation (not remotely checked yet)
+
+- File: `candidates/attempt04_grouped_prepare.py`.
+- Same dispatch as attempt 3, with four Q/K head rows per preparation block to
+  reduce the measured 6 us cost on large verify shapes. Offline compilation passes.
+- No remote check spent. Do not promote until measured.
+
+- Attempt 3 decision: recommend scored submit now; await fresh user approval.
+  Sliding decode B=1/16/32: 10.69/16.00/19.20 us. Sliding verify:
+  11.59/22.09/31.76 us. Full batched decode 181.54/327.47 us.
+
+## Attempt 5 — wider tiles and small-batch parallelism
+
+- File: `candidates/attempt05_wider_tiles.py`; remote check `911497e0df3d42bf`.
+- Use N=128 instead of 64, full-context chunks of 256 for smaller batches and
+  shorter capacities, grouped preparation from draft 4. Retest custom full verify.
+- Offline SM90 compilation passes. Resource analysis finds high register use
+  (up to 249 registers), so remote timing is essential; no promotion assumed.
+- Pending; 4/10 checks used, 6 remain including the 2 reserved. 1/5 scored runs used.

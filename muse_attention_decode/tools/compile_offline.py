@@ -6,6 +6,7 @@ are imported. The torch/FA3 stubs only let us load the submitted Triton definiti
 import importlib.util
 import os
 from pathlib import Path
+import subprocess
 import sys
 import types
 
@@ -33,6 +34,16 @@ def compile_one(name, signature, constants, **options):
     source = ASTSource(fn, signature=signature, constexprs=constants)
     kernel = triton.compile(source, target=target, options=options)
     print(name, constants, "shared", kernel.metadata.shared, flush=True)
+    report_dir = root / ".tools" / "resource-reports"
+    report_dir.mkdir(exist_ok=True)
+    label = name + "-" + str(constants.get("M", 0)) + "-" + str(constants.get("N", 0)) + "-" + str(constants.get("S", 0))
+    ptx_path = report_dir / (label + ".ptx")
+    ptx_path.write_text(kernel.asm["ptx"])
+    ptxas = Path(triton.__file__).parent / "backends" / "nvidia" / "bin" / "ptxas"
+    report = subprocess.run([str(ptxas), "-v", "--gpu-name=sm_90a", str(ptx_path),
+                             "-o", str(report_dir / (label + ".cubin"))],
+                            text=True, capture_output=True, check=True)
+    print(report.stderr, flush=True)
 
 
 for theta in (0., 500000.):
@@ -45,7 +56,7 @@ if hasattr(module, "_attention_parts"):
         compile_one("_attention_parts", dict(Q="*fp8e4nv", KC="*fp8e4nv", VC="*fp8e4nv", PT="*i32",
                                             LENS="*i32", KS="*fp32", VS="*fp32", PART="*fp32", LSE="*fp32"),
                     dict(HQ=16, HK=2, D=64, L=length, PAGE=page, PT_STRIDE=86008,
-                         SPLITS=42, CHUNK=2048, **({"WINDOW": 0} if "WINDOW" in module._attention_parts.arg_names else {}), SCALE=0.6841258107984375, M=max(16, length * 8), N=64),
+                         SPLITS=42, CHUNK=2048, **({"WINDOW": 0} if "WINDOW" in module._attention_parts.arg_names else {}), SCALE=0.6841258107984375, M=max(16, length * 8), N=getattr(module, "ATTENTION_N", 64)),
                     num_warps=4, num_stages=2)
     for length, splits in ((1, 42), (8, 513)):
         compile_one("_combine_gate", dict(PART="*fp32", LSE="*fp32", QKV="*bf16", O="*bf16"),
@@ -57,5 +68,5 @@ if hasattr(module, "_attention_parts") and "WINDOW" in module._attention_parts.a
     compile_one("_attention_parts", dict(Q="*fp8e4nv", KC="*fp8e4nv", VC="*fp8e4nv", PT="*i32",
                                         LENS="*i32", KS="*fp32", VS="*fp32", PART="*fp32", LSE="*fp32"),
                 dict(HQ=16, HK=2, D=64, L=8, PAGE=1, PT_STRIDE=86008,
-                     SPLITS=17, CHUNK=128, WINDOW=2048, SCALE=0.6841258107984375, M=64, N=64),
+                     SPLITS=17, CHUNK=128, WINDOW=2048, SCALE=0.6841258107984375, M=64, N=getattr(module, "ATTENTION_N", 64)),
                 num_warps=4, num_stages=2)
