@@ -59,3 +59,9 @@ if hasattr(module, "_gather_cache"):
     for page in (1, 64):
         check("_gather_cache", dict(KC="*u8", VC="*u8", TABLE="*i32", LENS="*i32", KOUT="*u8", VOUT="*u8"),
               dict(CAP=81920, PAGE=page, PT_STRIDE=81920//page, WIDTH=128, BLOCK=2048), 4)
+
+if hasattr(module, "_align_mixed_routes"):
+    for n in (2400, 4800, 6024, 8192):
+        check("_align_mixed_routes", dict(Ids="*i32", Local="*i32", S16="*i32", E16="*i32", T16="*i32", S32="*i32", E32="*i32", T32="*i32"),
+              dict(N=n, START=0, E=32, CUT=16, NP=triton.next_power_of_2(n), NE=32,
+                   NB16=triton.next_power_of_2(triton.cdiv(n,16)), NB32=triton.next_power_of_2(triton.cdiv(n,32))), 8)

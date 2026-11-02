@@ -134,7 +134,8 @@
 - Check: e10cdfade5d847af. PASS five tests/eight timed shapes, no flags.
   Speedup 1.110263x (95% interval 1.093609-1.126917), slower than submitted
   attempt 4 (1.139429x). Not promoted or submitted. Five checks used.
-  See per-shape/profile results before reusing either change.
+  The 3012-token shapes regressed to 0.924x/0.936x baseline, and expansion
+  was ~1.57 ms versus ~1.44 ms. Reuse neither change without new evidence.
 
 ## Attempt 6 - contiguous FP8 cache for full-attention prefills
 
@@ -157,3 +158,25 @@
 - Gather costs ~10.9 us per request; full-attention kernel remains the dominant
   cost. Retain attempt 4 as the submitted/default version.
 - Six checks used, four left, two reserved.
+
+## Attempt 7 - adaptive local Marlin schedules for short prefills
+
+- Independent candidate based on submitted attempt 4. Only <=1024-token
+  expert execution changes; larger prefills keep the submitted paths.
+- Borrowed the already committed _write_segment/_align_mixed_routes helpers
+  from muse_moe_w4a16/attempts/attempt_06.py as reference, copying them into
+  this problem only. No other problem files were changed.
+- Experts with <=16 local routes use M=16; busier ones use M=32. Schedules
+  omit nonlocal slots completely. Each expert is in exactly one group.
+- Two gate/up and two down GEMMs write disjoint BF16 rows. Original SiLU,
+  per-expert normalization and routing weights are retained; FP32 GEMM
+  reduction is unchanged. This is a scheduling/tile change only.
+- Offline SM90 compilation passed for 300, 600, 753 and 1024 tokens.
+- Source SHA256: 170fc213ad8c826cf4c8ea87710dedef8be15b46583cbe22ed7adb8a7940248a
+- Rationale: short-prefill Marlin still consumes ~65% of GPU time; the same
+  scheduling pattern has checked improvements at smaller token batches.
+- Check: 9d58ad6b10794c17. PASS five tests/eight timed shapes, no flags.
+  Speedup 1.123649x (95% interval 1.106794-1.140503), slower than submitted
+  attempt 4. Short shapes are 0.969x/0.972x baseline. Four expert GEMMs
+  total ~731 us vs ~700 us with baseline row tiles; not promoted/submitted.
+- Seven checks used, three left, two reserved. At most one more check today.
