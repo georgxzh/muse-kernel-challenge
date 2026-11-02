@@ -64,3 +64,52 @@
 - Frozen checked source: `attempts/attempt02.py`. Main `submission.py` currently matches this version.
 - Removing measured projection regressions and improving router occupancy gives a clear improvement over the first scored 1.0389x entry. Recommend submitting attempt 2 with explicit user permission.
 - Third check `faf23be693794770` remains queued. Total checks requested today: 3; seven left, including the two-check reserve. Four scored submissions remain.
+
+### Attempt 2 scored request
+
+- User explicitly approved submitting attempt 2; job `7708134c1ceb40e5` submitted from frozen `attempts/attempt02.py`.
+- The attempt 2 commit `3b0c284` was pushed successfully after retrying a transient GitHub connection reset.
+
+## Attempt 4 - contiguous transposed weights for larger cuBLAS batches
+
+- Candidate `attempts/attempt04.py`, based on verified attempt 2.
+- Prepare stores a lossless contiguous transpose of each BF16 weight. Batches above 32 use cuBLAS with this layout; small batches and the router retain attempt 2.
+- Rationale: large projection batches currently match the baseline; alternate exact weight layout changes cuBLAS algorithm selection without new arithmetic or precision risk.
+- This experiment is independent of attempt 3's lossless compression. Local Python syntax passes. Fourth check requested; six checks remain including two reserved.
+
+## Results for attempts 2 (scored), 3 and 4
+
+- Attempt 2 scored `7708134c1ceb40e5`: PASS, **1.1292x**, CI 1.1122-1.1461. Same `content_hash` as check `54d88712677b4685`.
+- Attempt 3 check `faf23be693794770`: FAILED 3/9 pretests, no timing. Every test reaching the packed path hit a judge compile error (`ttg.local_alloc` i1 in `TritonGPUReduceDataDuplication`). Local Triton 3.5.0 and 3.5.1 both compile the same kernel, so a local compile pass is not a gate for the judge. Packing is parked: by estimate 68-80% of 128x64 tiles contain an escape.
+- Attempt 4 check `9be65792f3f44eb8`: PASS, 1.1357x, CI 1.1187-1.1527, overlapping attempt 2. Per shape against the mean of the two attempt 2 runs: pooler m=128 +12.1%, unpooler m=128 +4.3%, unpooler m=256 +2.4%, pooler m=256 +1.2%, o within 1.3%, qkv_gate m=128 -2.8%, qkv_gate m=256 -6.3%. Not adopted whole.
+- Noise between the two attempt 2 runs on unchanged shapes: mean 1.2%, maximum 2.9%.
+
+## Verified-better rule (set by the user, 2026-11-02)
+
+A candidate is verified better when its changed shapes beat noise (over 3%), no other shape drops by more than 3%, and overall speedup is higher, even if confidence intervals overlap. Scored submissions still need explicit user approval each time.
+
+## Attempt 5 - three changes on disjoint shapes
+
+- Candidate `attempts/attempt05.py`, built from attempt 2. `submission.py` stays at attempt 2 until this is verified better.
+- pooler/unpooler at m>32: contiguous transposed weights (attempt 4's gain, without its qkv_gate and o changes).
+- Router at m>128: BM=128, split 8, 8 warps, so weights are read half as often as with BM=64, split 4.
+- qkv_gate at m<=32: `_tiled_mm`, a bit-exact repack into contiguous 64x64 tiles. Row-major control is attempt 1 (same tiles at m<=16): 14.19, 14.59, 14.78, 15.27 us at m=1, 8, 16, 32. m=32 uses BM=32 here, against attempt 1's BM=16.
+- Local validation (scratchpad only): real kernel code run on CPU through a mock of `triton.language`, scored by `reference.py`: 39/39 on all 30 scored shapes and 9 pretests, with attempt 2 as control at 39/39. All stored weight copies reconstruct bit-exactly. Offline compile passes on Triton 3.5.0 and 3.5.1. This covers correctness only, not speed, and does not rule out a judge compile failure.
+- Check `632584e6061b49a9` requested with user approval. Fifth check of the day; five left, two of them reserved. Three scored runs left.
+
+### Attempt 5 result
+
+- PASS 9/9 and all timed shapes, no flags: **1.1513x**, CI 1.1341-1.1686, overlapping attempt 2's 1.1122-1.1461.
+- **Not verified better under the rule; `submission.py` stays at attempt 2.** Per shape against the mean of the two attempt 2 runs:
+  - Changed shapes over +3%: router m=256 +35.5% (16.4 to 12.3 us), pooler m=128 +11.8%, unpooler m=128 +5.8%, qkv_gate m=1 +4.3%, qkv_gate m=8 +3.7%.
+  - Changed shapes under +3%: qkv_gate m=16 +2.6%, pooler m=256 +2.5%, unpooler m=256 +2.3%.
+  - Changed shape regressed: qkv_gate m=32 -5.9%.
+  - Unchanged shape over the limit: router m=1 -4.1% (-4.8% against the scored run). Its code path is unchanged, but this exceeds the 2.9% seen between attempt 2 runs, so noise is likely but not established. Against the scored run alone, router m=8 (-3.4%) and unpooler m=1 (-3.3%) also cross 3%.
+- Tiled layout against the row-major control (attempt 1, same tile parameters at m<=16): speedup up about 9-10% at m=1, 8, 16. m=32 is not a clean control because BM differs. Still far from the qkv_gate floor (13.1 us against 7.9 us).
+- Transposed weights at m=256 were small but positive in both attempt 4 and attempt 5.
+
+## Verified-better rule, group reading (user update, 2026-11-02)
+
+Changed shapes count as one group. A candidate is verified better when the group gains overall, no single shape regresses by more than 3%, and overall speedup is higher, even if intervals overlap. Scored submissions still need explicit user approval.
+
+- Attempt 5 under this rule: **still not verified better.** The group gains +6.4% by geometric mean, but qkv_gate m=32 (-5.9%) and router m=1 (-4.1%) each drop more than 3%.
