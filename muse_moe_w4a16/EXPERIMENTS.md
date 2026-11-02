@@ -39,3 +39,47 @@ Work is confined to this problem on `master`. Other chats share the repository.
   user approval required before running submit.
 - Snapshot: `attempts/attempt_01.py`; profile saved under `profiles/`.
 - Checks spent: 1; remaining: 9. Scored submissions spent: 0.
+
+## Attempt 2 — smaller Marlin row blocks
+
+- Same computation as attempt 1; choose block M=8 for token batches <=32,
+  otherwise M=16. Baseline selected 16, 48, 64 at M=32, 128, 256 respectively.
+- Rationale: baseline's tile heuristic includes remote routes; smaller tiles
+  should reduce padding and improve occupancy for sparse local assignments.
+- Python syntax compilation: passed.
+- Initial check request failed before creating a job (verified via `okc jobs`).
+  Retried with `GODEBUG=http2client=0` to avoid the HTTP/2 protocol failure.
+- Remote check: `71abb00c320f4ebb` (pending).
+- Checks spent: 2; expected remaining: 8. Preserve at least 2.
+
+## Submission of attempt 1
+
+- User explicitly approved one submission of `attempts/attempt_01.py`.
+- Scored job: `83fa44c28b254feb` (pending). Scored submissions spent: 1.
+- Attempt 1 commit: `7514239`, pushed to `origin/master`. HTTP 408 on initial
+  pushes was resolved by `git -c http.postBuffer=524288000 -c http.version=HTTP/1.1 push`.
+
+## Attempt 3 — fused local route alignment
+
+- Builds on attempt 2's row blocks, without changing arithmetic.
+- A Triton CTA per local expert reads the route IDs, computes a masked
+  32-bin histogram, derives disjoint padded offsets, and scatters stable
+  pair indices. CTA 0 also writes mapped local IDs and the padded total.
+- Nonlocal routes have no blocks in the GEMM schedule. The norm and SiLU
+  still mask nonlocal slots, so their unwritten intermediates are not read.
+- Fill/scatter within a CTA has an explicit barrier. Cross-CTA writes are
+  disjoint; downstream kernels wait on stream order.
+- Buffer capacity is min(N * BM, N + local_count * (BM - 1)), where N=M*8.
+  Both expressions bound the sum of per-expert padded counts for any routing.
+- Python syntax compilation: passed. No local GPU runtime available.
+- Remote check: `d3779b6e54304b26` (pending).
+- Snapshot: `attempts/attempt_03.py`; attempt 2 also saved separately.
+- Checks spent: 3; expected remaining: 7. Scored submissions spent: 1.
+
+## Attempt 3 result and scored submission
+
+- Check `d3779b6e54304b26`: PASS 5/5, 1.3440x, CI 1.3238-1.3642, no flags.
+- User explicitly approved one scored submission of `attempts/attempt_03.py`.
+- Scored job `e0f116ab0de94c44`: PASS 5/5, **1.3355x**, CI 1.3155-1.3556, no flags. Rank 1040 of 1316.
+- Its `content_hash` equals the check's (`9629a886...`), so the scored run is the code that passed the check.
+- `submission.py` remains at attempt 2; the scored run used the frozen attempt 3 file. Scored runs left today: 3. Checks left: 7.
