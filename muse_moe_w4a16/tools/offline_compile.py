@@ -30,13 +30,26 @@ if hasattr(module, "_align_local_routes"):
     fn = module._align_local_routes
     signature = {name: "*i32" for name in ["Ids", "Local", "Sorted", "Experts", "Total"]}
     for m in (1, 4, 8, 16, 32, 33, 128, 256, 257):
-        n, bm = m * 8, 8 if m <= 32 else 16
+        n = m * 8
+        bm = 8 if m <= 32 else (int(sys.argv[2]) if len(sys.argv) > 2 else 16)
         constants = dict(N=n, START=0, E=32, BM=bm,
                          NP=triton.next_power_of_2(n), NE=32,
                          NB=triton.next_power_of_2(triton.cdiv(n, bm)))
         result = triton.compile(ASTSource(fn, signature, constants), target=target,
                                 options={"num_warps": 4})
         print(f"align M={m} BM={bm}: compiled, shared={result.metadata.shared}", flush=True)
+
+if hasattr(module, "_align_mixed_routes"):
+    signature = {name: "*i32" for name in ["Ids", "Local", "S8", "E8", "T8", "S32", "E32", "T32"]}
+    for m in (33, 65, 128, 256, 257):
+        n = m * 8
+        constants = dict(N=n, START=0, E=32, CUT=16,
+                         NP=triton.next_power_of_2(n), NE=32,
+                         NB8=triton.next_power_of_2(triton.cdiv(n, 8)),
+                         NB32=triton.next_power_of_2(triton.cdiv(n, 32)))
+        result = triton.compile(ASTSource(module._align_mixed_routes, signature, constants),
+                                target=target, options={"num_warps": 4})
+        print(f"mixed align M={m}: compiled, shared={result.metadata.shared}", flush=True)
 
 if hasattr(module, "_post_norm_sum"):
     signature = dict(Y="*bf16", Scores="*fp32", Norm="*bf16", Ids="*i32", Out="*bf16")

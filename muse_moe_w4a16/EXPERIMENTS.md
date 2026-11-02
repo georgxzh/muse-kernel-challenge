@@ -107,3 +107,31 @@ Work is confined to this problem on `master`. Other chats share the repository.
   not launch that submission and will not duplicate it.
 - Promoted the checked frozen attempt 3 to `submission.py`.
 - Confirmed CLI quota: 7 checks and 3 scored submissions remaining.
+
+## Attempt 4 - use 8-row blocks at all sizes (regression)
+
+- Based on attempt 3, change the large-batch row block from 16 to 8.
+- Offline SM90 compilation passed all shapes; Python syntax passed.
+- First check request failed DNS lookup without creating a job; retry job
+  `cbc1221a72494149` passed all 5 tests and 6 timed shapes.
+- Speedup **1.219725x**, CI [1.201429, 1.238021], score 11025.84 us.
+- Per-shape baseline / candidate us: M1 77.04 / 48.91; M16 189.10 /
+  148.58; M32 206.77 / 198.69; M8 142.27 / 105.17; M128 458.67 /
+  389.22; M256 622.70 / 628.86.
+- Larger batches clearly regress versus attempt 3. Increased weight reads
+  outweigh reduced row padding. Do not promote or submit this candidate.
+- Snapshot `attempts/attempt_04.py`; verified active entry remains attempt 3.
+- Checks used: 4, remaining: 6. Scored submissions used: 2, remaining: 3.
+
+## Attempt 5 - adaptive sparse/busy expert blocks (prepared)
+
+- Route experts receiving <=16 tokens to 8-row GEMMs and busier experts to
+  32-row GEMMs. Small token batches retain attempt 3 exactly.
+- One GPU alignment launch builds both schedules. Each expert belongs to
+  exactly one group. Four GEMMs write disjoint rows in shared BF16 buffers;
+  SiLU runs once after both gate/up GEMMs; norm runs after both down GEMMs.
+- All intermediate rounding and FP32 reduction settings remain unchanged.
+- Python syntax and offline SM90 compilation passed, including M=33,65,
+  128,256,257 adaptive routing. Offline helper now supports both schedules.
+- First remote request failed connection reset. `okc jobs` confirmed no
+  attempt-5 job was created; retry needed. No check charged yet.
