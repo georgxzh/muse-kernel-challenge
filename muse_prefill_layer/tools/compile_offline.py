@@ -54,3 +54,8 @@ check("_route_hist", dict(IDS="*i32", COUNTS="*i32"), dict(SLOTS=131072), 4)
 check("_route_prefix", dict(COUNTS="*i32", PSUM="*i32", CURSOR="*i32"), {}, 4)
 check("_pack_routes", dict(X="*bf16", IDS="*i32", CURSOR="*i32", PACK="*bf16", MAP="*i32", LAYOUT="*i32"), dict(K=4096), 4)
 check("_zero_group_padding", dict(PACK="*bf16", PSUM="*i32"), dict(K=4096), 4)
+
+if hasattr(module, "_gather_cache"):
+    for page in (1, 64):
+        check("_gather_cache", dict(KC="*u8", VC="*u8", TABLE="*i32", LENS="*i32", KOUT="*u8", VOUT="*u8"),
+              dict(CAP=81920, PAGE=page, PT_STRIDE=81920//page, WIDTH=128, BLOCK=2048), 4)

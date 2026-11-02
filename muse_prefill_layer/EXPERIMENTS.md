@@ -151,4 +151,9 @@
 - Source: https://github.com/Dao-AILab/flash-attention/blob/main/hopper/flash_api.cpp
 - Offline SM90 compilation passed for gather with page sizes 1 and 64.
 - Source SHA256: b32e6e28dfe51c47f9b5186af724ddd2edb3615812bf5789d68fd910511727cc
-- Check: c5442121b8454919. Result pending; six used, four left, two reserved.
+- Check: c5442121b8454919. PASS five tests/eight timed shapes, no flags.
+  Speedup 1.142620x (95% interval 1.125481-1.159759). Gain over the
+  submitted 1.139429x is ~0.3%, inside timing uncertainty. Not submitted.
+- Gather costs ~10.9 us per request; full-attention kernel remains the dominant
+  cost. Retain attempt 4 as the submitted/default version.
+- Six checks used, four left, two reserved.
