@@ -134,4 +134,10 @@ Work is confined to this problem on `master`. Other chats share the repository.
 - Python syntax and offline SM90 compilation passed, including M=33,65,
   128,256,257 adaptive routing. Offline helper now supports both schedules.
 - First remote request failed connection reset. `okc jobs` confirmed no
-  attempt-5 job was created; retry needed. No check charged yet.
+  job was created; successful retry: `a511776d5176408f`.
+- PASS: all 5 tests and 6 timed shapes; **1.322713x**, CI [1.302872, 1.342554],
+  score 10167.36 us. M128 345.52 us vs 472.22 baseline; M256 445.46 us
+  vs 617.81 baseline. This does not beat attempt 3, which stays active.
+- Marlin's minimum MMA row tile is 16. The small group wastes weight reads
+  for experts with 9-16 tokens; next attempt should use 16 for that group.
+- Checks used: 5; remaining: 5. Scored submissions remaining: 3.
