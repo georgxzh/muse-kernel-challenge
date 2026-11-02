@@ -49,13 +49,23 @@ Work is confined to this problem on `master`. Other chats share the repository.
 - Python syntax compilation: passed.
 - Initial check request failed before creating a job (verified via `okc jobs`).
   Retried with `GODEBUG=http2client=0` to avoid the HTTP/2 protocol failure.
-- Remote check: `71abb00c320f4ebb` (pending).
+- Remote check: `71abb00c320f4ebb`: PASS, all 5 tests and 6 timed shapes.
+- Speedup: **1.245736x**, 95% CI [1.227050, 1.264422]; score 10795.62 us.
+- Per-shape SGLang / candidate (us): M1 80.35 / 57.58; M16 184.99 /
+  152.74; M32 203.26 / 207.49; M8 141.73 / 112.80; M128 467.42 /
+  343.24; M256 623.52 / 472.62.
+- Smaller row blocks clearly help large verification batches. M32 does not
+  improve; retain this as a tuning target. Snapshot `attempts/attempt_02.py`.
+- An isolated Python/Triton 3.5 offline compiler was installed entirely under
+  ignored `.tooling/`; `tools/offline_compile.py` compiles for SM90 without a GPU.
 - Checks spent: 2; expected remaining: 8. Preserve at least 2.
 
 ## Submission of attempt 1
 
 - User explicitly approved one submission of `attempts/attempt_01.py`.
-- Scored job: `83fa44c28b254feb` (pending). Scored submissions spent: 1.
+- Scored job: `83fa44c28b254feb`: PASS, **1.130308x**, CI [1.113354, 1.147263],
+  score 11898.08 us; all 5 tests and 6 timed shapes passed.
+- Scored submissions spent: 1 (4 remaining).
 - Attempt 1 commit: `7514239`, pushed to `origin/master`. HTTP 408 on initial
   pushes was resolved by `git -c http.postBuffer=524288000 -c http.version=HTTP/1.1 push`.
 

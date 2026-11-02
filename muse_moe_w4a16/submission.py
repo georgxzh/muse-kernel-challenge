@@ -133,9 +133,9 @@ def kernel_fn(data, state):
     local_ids = local_ids.contiguous()
     topk_weights = data["topk_weights"].to(torch.float32).contiguous()
 
-    for block_size_m in BLOCK_SIZE_M_CANDIDATES:
-        if num_tokens * TOP_K / bank["count"] / block_size_m < 0.9:
-            break
+    # EP computes only a share of the global routes. Avoid large, mostly
+    # padded matrix tiles chosen from the total (including remote) routes.
+    block_size_m = 8 if num_tokens <= 32 else 16
     if num_tokens == 1 and expert_map is None:
         from sglang.kernels.ops.moe.moe_align_single_token import moe_align_single_token
 
