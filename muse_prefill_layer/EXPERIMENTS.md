@@ -74,3 +74,20 @@
 - Next fix: use a floating-point zero fallback for the FP8 scale load.
 - Initial requests failed with transient network errors; using
   GODEBUG=http2client=0 resolved the HTTP/2 protocol failure.
+
+## Attempt 3 - fix FP8 scale load type
+
+- Same grouped BF16 expert candidate as attempt 2, with other=0.0 for the
+  masked FP8 scale load instead of integer other=0.
+- Added tools/compile_offline.py. All five custom Triton kernels compile for
+  SM90 with Triton 3.5.1, including all RoPE/cache-scale variants. Compiler
+  outputs and caches stay inside .tools/; interpreter reused read-only with
+  bytecode writing disabled. This validates code generation, not correctness.
+- Source SHA256: 450ad5ddcc02c26de02923eeb52358c372319f9f28163c0a02ec1d68067c8a80
+- Check: c2db90db6bc943ac. Result: PASS five tests and eight timed shapes;
+  speedup 0.917684x (95% interval 0.903918-0.931449), score 422154.1 us.
+  No flags. Three checks used, seven left, two reserved.
+- Profile: grouped GEMMs take ~11.5 + 5.7 ms; expansion only ~1.5 ms.
+  This resembles work over padded capacity, including nonlocal rows, rather
+  than only active routes. Investigate runtime-count scheduling before another check.
+- Not submitted: no demonstrated speedup.

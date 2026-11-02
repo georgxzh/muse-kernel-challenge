@@ -288,7 +288,7 @@ def _expand_nvfp4(W, SF, GS, OUT, NK: tl.constexpr, BLOCK: tl.constexpr):
     bits = ((mag // 2 + 126) << 23) | ((mag & 1) << 22)
     value = tl.where(mag < 2, mag.to(tl.float32) * 0.5, bits.to(tl.float32, bitcast=True))
     value = tl.where((code & 8) != 0, -value, value)
-    sf = tl.load(SF + e * (NK // 16) + i // 16, i < NK, other=0).to(tl.float32)
+    sf = tl.load(SF + e * (NK // 16) + i // 16, i < NK, other=0.0).to(tl.float32)
     gs = tl.load(GS + e)
     tl.store(OUT + e * NK + i, (value * (sf * gs)).to(tl.bfloat16), i < NK)
 
