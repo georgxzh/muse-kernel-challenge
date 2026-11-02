@@ -168,6 +168,72 @@ def _align_local(ids, cfg, bm):
     )
     return local, sorted_ids, experts, total
 
+@triton.jit
+def _write_segment(Own, Sorted, Experts, base, count,
+                   N: tl.constexpr, BM: tl.constexpr,
+                   NP: tl.constexpr, NB: tl.constexpr):
+    p = tl.arange(0, NP)
+    n_pad = tl.cdiv(count, BM) * BM
+    tl.store(Sorted + base + p, N, p < n_pad)
+    tl.debug_barrier()
+    rank = tl.cumsum(Own.to(tl.int32), 0) - 1
+    tl.store(Sorted + base + rank, p, Own)
+    b = tl.arange(0, NB)
+    tl.store(Experts + base // BM + b, tl.program_id(0), b < n_pad // BM)
+
+
+@triton.jit
+def _align_mixed_routes(Ids, Local, S16, E16, T16, S32, E32, T32,
+                        N: tl.constexpr, START: tl.constexpr,
+                        E: tl.constexpr, CUT: tl.constexpr,
+                        NP: tl.constexpr, NE: tl.constexpr,
+                        NB16: tl.constexpr, NB32: tl.constexpr):
+    expert = tl.program_id(0)
+    p = tl.arange(0, NP)
+    ids = tl.load(Ids + p, p < N, other=-1) - START
+    valid = (p < N) & (ids >= 0) & (ids < E)
+    if expert == 0:
+        tl.store(Local + p, tl.where(valid, ids, -1), p < N)
+    own = valid & (ids == expert)
+    count = tl.sum(own.to(tl.int32), 0)
+    if (count > 0) | (expert == 0):
+        hist = tl.histogram(tl.where(valid, ids, 0), NE, mask=valid)
+        pad16 = tl.where(hist <= CUT, tl.cdiv(hist, 16) * 16, 0)
+        pad32 = tl.where(hist > CUT, tl.cdiv(hist, 32) * 32, 0)
+        e = tl.arange(0, NE)
+        base16 = tl.sum(tl.where(e < expert, pad16, 0), 0)
+        base32 = tl.sum(tl.where(e < expert, pad32, 0), 0)
+        if expert == 0:
+            tl.store(T16, tl.sum(pad16, 0))
+            tl.store(T32, tl.sum(pad32, 0))
+        if count > CUT:
+            _write_segment(own, S32, E32, base32, count, N, 32, NP, NB32)
+        else:
+            _write_segment(own, S16, E16, base16, count, N, 16, NP, NB16)
+
+
+def _align_mixed(ids, cfg, cut=16):
+    n = ids.numel()
+    count = cfg["local_count"]
+    local = torch.empty_like(ids)
+    groups = []
+    for bm in (16, 32):
+        capacity = min(n * bm, n + count * (bm - 1))
+        sorted_ids = torch.empty((capacity,), dtype=torch.int32, device=ids.device)
+        experts = torch.empty((triton.cdiv(capacity, bm),), dtype=torch.int32, device=ids.device)
+        total = torch.empty((1,), dtype=torch.int32, device=ids.device)
+        groups.append((sorted_ids, experts, total, bm))
+    _align_mixed_routes[(count,)](
+        ids, local, *groups[0][:3], *groups[1][:3],
+        N=n, START=cfg["local_start"], E=count, CUT=cut,
+        NP=triton.next_power_of_2(n), NE=triton.next_power_of_2(count),
+        NB16=triton.next_power_of_2(triton.cdiv(n, 16)),
+        NB32=triton.next_power_of_2(triton.cdiv(n, 32)),
+        num_warps=4,
+    )
+    return local, groups
+
+
 def kernel_fn(data, state):
     cfg = data["config"]
     bank = state["banks"][(cfg["local_start"], cfg["local_count"])]
@@ -178,28 +244,34 @@ def kernel_fn(data, state):
     expert_map = bank["expert_map"]
 
     # Fused mapping/alignment excludes remote routes from Marlin's schedule.
-    block_size_m = 8 if num_tokens <= 32 else 16
-    local_ids, sorted_ids, block_experts, n_padded = _align_local(
-        data["topk_ids"], cfg, block_size_m)
+    if num_tokens <= 32:
+        local_ids, sorted_ids, block_experts, n_padded = _align_local(
+            data["topk_ids"], cfg, 8)
+        groups = [(sorted_ids, block_experts, n_padded, 8)]
+    else:
+        local_ids, groups = _align_mixed(data["topk_ids"], cfg)
     topk_weights = data["topk_weights"].to(torch.float32).contiguous()
 
     cache2 = torch.empty((num_tokens * TOP_K, size_n), device=x.device, dtype=x.dtype)
     cache13 = torch.empty((num_tokens * TOP_K * max(gemm1_n, size_k),), device=x.device, dtype=x.dtype)
     cache1 = cache13[: num_tokens * TOP_K * gemm1_n].view(-1, gemm1_n)
     cache3 = cache13[: num_tokens * TOP_K * size_k].view(-1, size_k)
-    common = dict(moe_block_size=block_size_m, mul_topk_weights=False, is_ep=expert_map is not None,
+    common = dict(mul_topk_weights=False, is_ep=expert_map is not None,
                   b_q_type=scalar_types.float4_e2m1f, is_k_full=True, use_atomic_add=False,
                   use_fp32_reduce=True, is_zp_float=False)
     ws = state["workspace"]
-    cache1 = moe_wna16_marlin_gemm(
-        x, cache1, bank["w13"], None, bank["w13_s"], bank["w13_gs"], None, None, None, ws,
-        sorted_ids, block_experts, n_padded, topk_weights, top_k=TOP_K,
-        size_m=num_tokens, size_n=gemm1_n, size_k=size_k, **common)
+    for sorted_ids, block_experts, n_padded, bm in groups:
+        moe_wna16_marlin_gemm(
+            x, cache1, bank["w13"], None, bank["w13_s"], bank["w13_gs"], None, None, None, ws,
+            sorted_ids, block_experts, n_padded, topk_weights, top_k=TOP_K,
+            size_m=num_tokens, size_n=gemm1_n, size_k=size_k, moe_block_size=bm, **common)
     silu_and_mul(cache1.view(-1, gemm1_n), cache2, expert_ids=local_ids.view(-1), expert_step=1)
-    y = moe_wna16_marlin_gemm(
-        cache2, cache3, bank["w2"], None, bank["w2_s"], bank["w2_gs"], None, None, None, ws,
-        sorted_ids, block_experts, n_padded, topk_weights, top_k=1,
-        size_m=num_tokens * TOP_K, size_n=size_k, size_k=size_n, **common).view(num_tokens, TOP_K, size_k)
+    for sorted_ids, block_experts, n_padded, bm in groups:
+        moe_wna16_marlin_gemm(
+            cache2, cache3, bank["w2"], None, bank["w2_s"], bank["w2_gs"], None, None, None, ws,
+            sorted_ids, block_experts, n_padded, topk_weights, top_k=1,
+            size_m=num_tokens * TOP_K, size_n=size_k, size_k=size_n, moe_block_size=bm, **common)
+    y = cache3.view(num_tokens, TOP_K, size_k)
     out = torch.empty_like(x)
     _post_norm_sum[(num_tokens,)](
         y, topk_weights, state["norm_w"], local_ids, out,

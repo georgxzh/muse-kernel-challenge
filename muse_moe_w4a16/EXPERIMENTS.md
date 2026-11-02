@@ -141,3 +141,27 @@ Work is confined to this problem on `master`. Other chats share the repository.
 - Marlin's minimum MMA row tile is 16. The small group wastes weight reads
   for experts with 9-16 tokens; next attempt should use 16 for that group.
 - Checks used: 5; remaining: 5. Scored submissions remaining: 3.
+
+## Attempt 6 - adaptive 16/32-row blocks
+
+- Fix attempt 5's small group to use one 16-row tile for 9-16 tokens.
+- Experts with <=16 tokens use BM16; other experts use BM32. Token batches
+  <=32 keep the already-verified attempt-3 path.
+- Python syntax and offline SM90 compilation passed, including nearby M=65.
+- Remote check: `845df6a7fadd4c2a`: PASS, all 5 tests and 6 timed shapes.
+- Speedup **1.366962x**, CI [1.346457, 1.387466], score 9838.24 us.
+- M128 318.28 us vs 470.10 baseline (1.477x); M256 403.19 us vs 618.50
+  baseline (1.534x). Overall gain over attempt 3 is modest and CIs overlap.
+- Promote this to active `submission.py`; recommend a scored submission
+  after asking for explicit approval. Snapshot `attempts/attempt_06.py`.
+- Checks used after launch: 6; remaining: 4.
+
+## Attempt 7 - adaptive 16/64-row blocks
+
+- Explore more weight reuse for the very busiest experts: <=32 tokens use
+  BM16; >32 use BM64. Small token batches still retain attempt 3.
+- NVFP4 weights, BF16 activations, and FP32 reductions are unchanged.
+- Python syntax and offline SM90 compilation passed for every target size.
+- Remote check: `c2def1a570fd4209` (pending).
+- Checks used after launch: 7; remaining: 3. At most one more check may be
+  used today; two checks remain reserved. Scored submissions remaining: 3.

@@ -40,16 +40,22 @@ if hasattr(module, "_align_local_routes"):
         print(f"align M={m} BM={bm}: compiled, shared={result.metadata.shared}", flush=True)
 
 if hasattr(module, "_align_mixed_routes"):
-    signature = {name: "*i32" for name in ["Ids", "Local", "S8", "E8", "T8", "S32", "E32", "T32"]}
+    fn = module._align_mixed_routes
+    small = 16 if "S16" in fn.arg_names else 8
+    large = 64 if "S64" in fn.arg_names else 32
+    cut = 32 if large == 64 else 16
+    names = ["Ids", "Local", f"S{small}", f"E{small}", f"T{small}",
+             f"S{large}", f"E{large}", f"T{large}"]
+    signature = {name: "*i32" for name in names}
     for m in (33, 65, 128, 256, 257):
         n = m * 8
-        constants = dict(N=n, START=0, E=32, CUT=16,
-                         NP=triton.next_power_of_2(n), NE=32,
-                         NB8=triton.next_power_of_2(triton.cdiv(n, 8)),
-                         NB32=triton.next_power_of_2(triton.cdiv(n, 32)))
-        result = triton.compile(ASTSource(module._align_mixed_routes, signature, constants),
+        constants = dict(N=n, START=0, E=32, CUT=cut,
+                         NP=triton.next_power_of_2(n), NE=32)
+        constants[f"NB{small}"] = triton.next_power_of_2(triton.cdiv(n, small))
+        constants[f"NB{large}"] = triton.next_power_of_2(triton.cdiv(n, large))
+        result = triton.compile(ASTSource(fn, signature, constants),
                                 target=target, options={"num_warps": 4})
-        print(f"mixed align M={m}: compiled, shared={result.metadata.shared}", flush=True)
+        print(f"mixed align M={m} blocks={small}/{large}: compiled, shared={result.metadata.shared}", flush=True)
 
 if hasattr(module, "_post_norm_sum"):
     signature = dict(Y="*bf16", Scores="*fp32", Norm="*bf16", Ids="*i32", Out="*bf16")
