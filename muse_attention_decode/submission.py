@@ -1,5 +1,5 @@
 # okc: problem=muse_attention_decode
-"""Fused attention preparation and output gate around SGLang's FP8 FA3."""
+"""Paged FP8 attention with fused preparation/gate and FA3 for batched full verify."""
 
 import torch
 import triton as tr
@@ -7,37 +7,44 @@ import triton.language as tl
 import triton.language.extra.cuda.libdevice as libdevice
 from sgl_kernel.flash_attn import flash_attn_with_kvcache
 
+ATTENTION_N = 128
+
 
 @tr.jit
 def _prepare(QKV, POS, LOC, KS, VS, KC, VC, Q,
              HQ: tl.constexpr, HK: tl.constexpr, D: tl.constexpr,
-             STRIDE: tl.constexpr, THETA: tl.constexpr):
-    t = tl.program_id(0)
-    h = tl.program_id(1)
+             STRIDE: tl.constexpr, THETA: tl.constexpr,
+             TOKENS: tl.constexpr, BLOCK: tl.constexpr):
+    row = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    t = row // (HQ + HK)
+    h = row % (HQ + HK)
+    valid = t < TOKENS
     x = tl.arange(0, D)
-    a = tl.load(QKV + t * STRIDE + h * D + x).to(tl.float32)
-    r = tl.rsqrt(tl.sum(a * a, 0) / D + 1.e-5)
-    a = a * r
+    a = tl.load(QKV + t[:, None] * STRIDE + h[:, None] * D + x[None, :],
+                mask=valid[:, None], other=0.).to(tl.float32)
+    r = tl.rsqrt(tl.sum(a * a, 1) / D + 1.e-5)
+    a = a * r[:, None]
     if THETA != 0:
-        # Interleaved RoPE, evaluated at the actual GPU token position.
-        other = tl.load(QKV + t * STRIDE + h * D + (x ^ 1)).to(tl.float32) * r
+        other = tl.load(QKV + t[:, None] * STRIDE + h[:, None] * D + (x[None, :] ^ 1),
+                        mask=valid[:, None], other=0.).to(tl.float32) * r[:, None]
         freq = tl.div_rn(1., libdevice.pow(THETA, ((x // 2) * 2).to(tl.float32) / D))
-        angle = tl.load(POS + t).to(tl.float32) * freq
+        angle = tl.load(POS + t, mask=valid, other=0).to(tl.float32)[:, None] * freq[None, :]
         c = libdevice.cos(angle)
         s = libdevice.sin(angle)
-        a = a * c + tl.where(x % 2 == 0, -other, other) * s
-    if h < HQ:
-        # SGLang stores normalized BF16 queries before converting to E4M3.
-        a = a.to(tl.bfloat16).to(tl.float32)
-        tl.store(Q + (t * HQ + h) * D + x, a)
-    else:
-        kh = h - HQ
-        loc = tl.load(LOC + t)
-        kscale = tl.load(KS)
-        vscale = tl.load(VS)
-        v = tl.load(QKV + t * STRIDE + (HQ + HK + kh) * D + x).to(tl.float32)
-        tl.store(KC + (loc * HK + kh) * D + x, a / kscale)
-        tl.store(VC + (loc * HK + kh) * D + x, v / vscale)
+        a = a * c + tl.where(x[None, :] % 2 == 0, -other, other) * s
+    q = a.to(tl.bfloat16).to(tl.float32)
+    tl.store(Q + (t[:, None] * HQ + h[:, None]) * D + x[None, :], q,
+             mask=valid[:, None] & (h[:, None] < HQ))
+    kh = h - HQ
+    is_k = valid & (h >= HQ)
+    loc = tl.load(LOC + t, mask=is_k, other=0)
+    v = tl.load(QKV + t[:, None] * STRIDE + (HQ + HK + kh[:, None]) * D + x[None, :],
+                mask=is_k[:, None], other=0.).to(tl.float32)
+    tl.store(KC + (loc[:, None] * HK + kh[:, None]) * D + x[None, :],
+             a / tl.load(KS), mask=is_k[:, None])
+    tl.store(VC + (loc[:, None] * HK + kh[:, None]) * D + x[None, :],
+             v / tl.load(VS), mask=is_k[:, None])
+
 
 
 @tr.jit
@@ -68,7 +75,7 @@ def _attention_parts(Q, KC, VC, PT, LENS, KS, VS, PART, LSE,
     n = tl.arange(0, N)
     j = r // G
     q = tl.load(Q + ((b * L + j[:, None]) * HQ + kh * G + r[:, None] % G) * D + d[None, :],
-                mask=r[:, None] < L * G, other=0.).to(tl.bfloat16)
+                mask=r[:, None] < L * G, other=0.)
     seqlen = tl.load(LENS + b)
     pos = seqlen - L + j
     scale = tl.load(KS) * SCALE * 1.4426950408889634
@@ -83,7 +90,7 @@ def _attention_parts(Q, KC, VC, PT, LENS, KS, VS, PART, LSE,
         pages = tl.load(PT + b * PT_STRIDE + ts // PAGE, mask=ts < seqlen, other=0)
         rows = pages * PAGE + ts % PAGE
         k = tl.load(KC + (rows[None, :] * HK + kh) * D + d[:, None],
-                    mask=ts[None, :] < seqlen, other=0.).to(tl.bfloat16)
+                    mask=ts[None, :] < seqlen, other=0.)
         logits = tl.dot(q, k) * scale
         logits = tl.where((ts[None, :] < seqlen) & (ts[None, :] <= pos[:, None]), logits, -float("inf"))
         if WINDOW:
@@ -136,11 +143,11 @@ def kernel_fn(data):
     stride = qkv.stride(-2)
     window = cfg["window"]
     q = torch.empty((tokens, hq, d), device=qkv.device, dtype=torch.float8_e4m3fn)
-    _prepare[(tokens, hq + hk)](
+    _prepare[(tr.cdiv(tokens * (hq + hk), 4),)](
         qkv, data["positions"], data["cache_loc"], data["k_scale"], data["v_scale"],
-        data["k_cache"], data["v_cache"], q, hq, hk, d, stride, cfg["rope_theta"],
+        data["k_cache"], data["v_cache"], q, hq, hk, d, stride, cfg["rope_theta"], tokens, 4,
         num_warps=4, enable_fp_fusion=False)
-    if not window and (length != 1 or b < 8):
+    if not window and length > 1 and b * hk >= 16:
         descale = {}
         if cfg["kv_scale"] != 1.:
             descale = dict(k_descale=data["k_scale"].reshape(1, 1).expand(b, hk),
@@ -160,6 +167,8 @@ def kernel_fn(data):
         return out
     chunk = (128 if b < 8 else 256) if window else 2048
     capacity = data["page_table"].shape[1] * cfg["page_size"]
+    if not window and b < 8 and capacity <= 262144:
+        chunk = 256
     span = min(capacity, window + length - 1) if window else capacity
     splits = tr.cdiv(span, chunk)
     rows = length * (hq // hk)
@@ -170,7 +179,7 @@ def kernel_fn(data):
         q, data["k_cache"], data["v_cache"], data["page_table"], data["cache_seqlens"],
         data["k_scale"], data["v_scale"], partial, lse, hq, hk, d, length,
         cfg["page_size"], data["page_table"].stride(0), splits, chunk, window,
-        cfg["sm_scale"] * cfg["qk_scale_factor"], max(16, tr.next_power_of_2(rows)), 64,
+        cfg["sm_scale"] * cfg["qk_scale_factor"], max(16, tr.next_power_of_2(rows)), ATTENTION_N,
         num_warps=4, num_stages=2)
     _combine_gate[(tokens, hq)](
         partial, lse, qkv, out, hq, hk, d, length, stride, splits,

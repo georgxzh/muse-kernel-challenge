@@ -124,3 +124,18 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   ~200/386 us. Next combine native FP8 with FA3 for batched full verify.
 - Attempt 3 scored run `526d2f2d75ef4631`: PASS 16/16, 1.28034635x,
   95% CI [1.26114116, 1.30460614], score 2941.626 us. This remains the live best.
+
+## Attempt 7 — native FP8 / FA3 hybrid
+
+- File: `candidates/attempt07_hybrid.py`; check `f966398b2a454b3e`: PASS 16/16, speedup 1.37586848x. Promoted unchanged to submission.py.
+- Identical native-FP8 attention and grouped preparation to passing attempt 6.
+  For full verify with batch * num_kv_heads >= 16, use passing FA3 path instead.
+  All dispatch depends solely on public shapes/config, never tensor values.
+- Python syntax and diff-whitespace checks pass; unchanged Triton bodies already
+  compile and passed attempt 6. This check validates the combined dispatch end to end.
+- 6/10 attention checks used, 4 remain, of which 2 are always reserved.
+- Best scored remains attempt 3: job `526d2f2d75ef4631`, 1.28034635x.
+- No more scored submits are authorized yet (2/5 used).
+
+- Attempt 7 95% CI: [1.35523045187781, 1.4024870769109], score 2737.39827411617 us.
+- Decision: recommend immediate scored submission; fresh user approval pending.
