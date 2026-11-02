@@ -161,8 +161,15 @@ correctness or performance result.
 - Router bias, sigmoid, top-8 selection and normalization retain SGLang's op.
 - All original FP32 router weights remain in state, with the allowed BF16
   high/low pair. Both matrix accumulations and their reduction stay FP32.
-- Local ast.parse passed. Sixth check dispatched next; 4 remain afterward,
-  including 2 reserved. submission.py remains the approved attempt 4.
+- Local ast.parse passed. Check 9009425450f04502: PASS, 13/13 tests, no flags.
+- Speedup 1.1309949x; 95% CI [1.1140300, 1.1479598]; score 20000.3551 us.
+- Source SHA256: 8b4e6e50c49c84543e059bac24b2ec9296564f68a85c238bc6741a34c203a50e.
+- Profile: profiles/candidate_router.9009425450f04502.txt.
+- All timed shapes faster than SGLang; T=8 reaches 1.220-1.228x and T=32
+  improves to 1.038-1.086x. Larger batches retain attempt 4 expert tiles.
+- Decision: promote the exact checked source to submission.py and recommend
+  a scored update with explicit user approval.
+- Sixth check today; 4 remained at dispatch, including 2 reserved.
 
 ## Approved scored entry for attempt 4
 
@@ -174,3 +181,17 @@ correctness or performance result.
 - Current best checked and scored source: attempt 4 in submission.py (da14c66).
 - Runtime limits after dispatching attempt 6: 6 checks used, 4 left (2 reserved);
   3 scored submissions used, 2 left.
+
+## Attempt 7: intermediate M=32 route tiles for large batches
+
+- File: candidate_tiles32.py, independently based on checked attempt 4.
+- Expert tiles: M=8 for T<=16, M=16 for 17-32 tokens, M=32 above 32.
+- Motivation: measured M=8 loses large-batch weight reuse, while baseline
+  M=48/64 wastes padding relative to M=16. Test the intermediate tile.
+- Router remains SGLang's; this test isolates route-tile performance from
+  the still-running attempt 6 router experiment.
+- Same weights, precision, FP32 reductions, norms, and complete routing.
+- Local ast.parse passed. Check 877b103cc2b240ec: queued.
+- Seventh check today; 3 remain, including 2 reserved.
+- submission.py promoted separately to checked attempt 6; this check tests the
+  original attempt-4 base independently so the tile effect can be assessed.

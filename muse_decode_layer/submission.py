@@ -171,6 +171,39 @@ def _dense_reduce(P, O, SIZE: tl.constexpr, SPLIT: tl.constexpr,
     tl.store(O + i, tl.sum(partial, axis=0), i < SIZE)
 
 
+@triton.jit
+def _router_partials(X, HI, LO, P, M: tl.constexpr, BM: tl.constexpr):
+    # The permitted BF16 high/low router representation, both accumulated FP32.
+    mi = tl.program_id(0) * BM + tl.arange(0, BM)
+    ni = tl.program_id(1) * 32 + tl.arange(0, 32)
+    split = tl.program_id(2)
+    ki = split * 512 + tl.arange(0, 128)
+    hi_acc = tl.full((BM, 32), 0, tl.float32)
+    lo_acc = tl.full((BM, 32), 0, tl.float32)
+    for step in range(4):
+        kk = ki + step * 128
+        x = tl.load(X + mi[:, None] * 8192 + kk[None, :], mi[:, None] < M, other=0)
+        high = tl.load(HI + kk[:, None] * 256 + ni[None, :])
+        low = tl.load(LO + kk[:, None] * 256 + ni[None, :])
+        hi_acc += tl.dot(x, high)
+        lo_acc += tl.dot(x, low)
+    tl.store(P + split * M * 256 + mi[:, None] * 256 + ni[None, :],
+             hi_acc + lo_acc, mi[:, None] < M)
+
+
+def _router_logits(x, state):
+    m = x.shape[0]
+    partial = torch.empty((16, m, 256), device=x.device, dtype=torch.float32)
+    out = torch.empty((m, 256), device=x.device, dtype=torch.float32)
+    bm = 16 if m <= 16 else 32
+    _router_partials[(triton.cdiv(m, bm), 8, 16)](
+        x, state["router_hi_t"], state["router_lo_t"], partial, m, bm,
+        num_warps=4, num_stages=2)
+    _dense_reduce[(triton.cdiv(m * 256, 256),)](
+        partial, out, m * 256, 16, 256, num_warps=4)
+    return out
+
+
 def _gemm(x, w):
     m, k = x.shape
     n = w.shape[0]
@@ -416,7 +449,7 @@ def kernel_fn(data, state):
     attn_output = _gemm(o, dense["o"])  # all-reduce: identity
 
     # Post-attention boundary, router and MoE block: MuseSpark1xMoE._forward_experts.
-    split_router = tokens > ROUTER_FP32_MAX_TOKENS
+    split_router = tokens > 1
     ffn_input, stream, router_input = state["attn_boundary"](
         data["stream"], attn_output, branch_dtype=torch.bfloat16, router_dtype=None if split_router else torch.float32)
     # The router and routing run on a side stream, overlapping the pooler on the main one.
@@ -424,7 +457,9 @@ def kernel_fn(data, state):
     side_stream.wait_stream(main_stream)
     expert_input = _gemm(ffn_input, dense["pooler"])
     with torch.cuda.stream(side_stream):
-        if split_router:
+        if 1 < tokens <= 32:
+            logits = _router_logits(ffn_input, state)
+        elif split_router:
             logits = torch.mm(ffn_input, state["router_hi_t"], out_dtype=torch.float32)
             logits += torch.mm(ffn_input, state["router_lo_t"], out_dtype=torch.float32)
         else:
