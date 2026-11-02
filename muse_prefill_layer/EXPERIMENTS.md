@@ -131,4 +131,24 @@
 - Reason for check: expansion costs ~1.44 ms on long prefills; medium prefills
   spend ~2.2 ms in Marlin and may benefit from grouped BF16 GEMMs.
 - Source SHA256: d2d9ac293c8f1106eb3b3711e0042e066a46180ab0618d29bca896515f11ecad
-- Check: e10cdfade5d847af. Result pending; five checks used, five left, two reserved.
+- Check: e10cdfade5d847af. PASS five tests/eight timed shapes, no flags.
+  Speedup 1.110263x (95% interval 1.093609-1.126917), slower than submitted
+  attempt 4 (1.139429x). Not promoted or submitted. Five checks used.
+  See per-shape/profile results before reusing either change.
+
+## Attempt 6 - contiguous FP8 cache for full-attention prefills
+
+- Independent candidate based on submitted attempt 4, retaining its expert path.
+- Gather the paged K/V cache into contiguous logical sequence order inside
+  kernel_fn, after writing new entries to the original cache. Copy as uint8
+  bytes, preserving every FP8 value exactly; no scaling or rounding changes.
+- On full layers, call FA3 with unpaged cache and the original device sequence
+  lengths and query offsets. Sliding layers retain the submitted paged path.
+- All allocations depend only on shapes. The full context is gathered; FA3's
+  original causal mask and scales are retained. No sparse/block skipping.
+- Rationale: upstream FA3 uses PagedKVNonTMA for one-token pages; contiguous
+  cache enables TMA. Profile full-attention costs reach 4.5-8 ms on long prefills.
+- Source: https://github.com/Dao-AILab/flash-attention/blob/main/hopper/flash_api.cpp
+- Offline SM90 compilation passed for gather with page sizes 1 and 64.
+- Source SHA256: b32e6e28dfe51c47f9b5186af724ddd2edb3615812bf5789d68fd910511727cc
+- Check: c5442121b8454919. Result pending; six used, four left, two reserved.
