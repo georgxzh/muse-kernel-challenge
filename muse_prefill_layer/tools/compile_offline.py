@@ -42,8 +42,6 @@ def check(name, signature, constants, warps):
 
 check("_expand_nvfp4", dict(W="*u8", SF="*fp8e4nv", GS="*fp32", OUT="*bf16"),
       dict(NK=8192*4096, BLOCK=2048), 4)
-check("_pack_grouped", dict(X="*bf16", SORT="*i32", EXP="*i32", NP="*i32", PACK="*bf16", LAYOUT="*i32", MAP="*i32"),
-      dict(CAP=36960, M=36992, K=4096, SLOTS=32768), 4)
 check("_grouped_silu", dict(H="*bf16", I="*bf16", LAYOUT="*i32"), dict(D=4096), 4)
 check("_grouped_finalize", dict(Y="*bf16", WEIGHTS="*fp32", IDS="*i32", MAP="*i32", NORM="*bf16", OUT="*bf16"),
       dict(D=4096), 8)
@@ -51,3 +49,8 @@ for rope in (False, True):
     for scaled in (False, True):
         check("_qk_cache", dict(QKV="*bf16", Q="*fp8e4nv", KC="*fp8e4nv", VC="*fp8e4nv", LOC="*i64", POS="*i64", CS="*fp32", KS="*fp32", VS="*fp32"),
               dict(T=4096, STRIDE=2304, ROPE=rope, SCALED=scaled), 4)
+
+check("_route_hist", dict(IDS="*i32", COUNTS="*i32"), dict(SLOTS=131072), 4)
+check("_route_prefix", dict(COUNTS="*i32", PSUM="*i32", CURSOR="*i32"), {}, 4)
+check("_pack_routes", dict(X="*bf16", IDS="*i32", CURSOR="*i32", PACK="*bf16", MAP="*i32", LAYOUT="*i32"), dict(K=4096), 4)
+check("_zero_group_padding", dict(PACK="*bf16", PSUM="*i32"), dict(K=4096), 4)

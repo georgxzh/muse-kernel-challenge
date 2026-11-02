@@ -24,7 +24,7 @@
 
 ## Attempt 1 - fused QK/cache and prefill Marlin alignment
 
-- Source: submission.py, SHA256:
+- Source: submission.py, server content key (not raw-file SHA256):
   7a91299a10e1a546c40bd6038dec3e486086320b1eb220b2b9d15822e2a7e60d
 - Start from supplied SGLang baseline. Retain FA3, dense projections, residual
   norms, router hi/lo split, NVFP4 Marlin weights and expert execution.
@@ -91,3 +91,27 @@
   This resembles work over padded capacity, including nonlocal rows, rather
   than only active routes. Investigate runtime-count scheduling before another check.
 - Not submitted: no demonstrated speedup.
+
+## Attempt 4 - compact routes and GPU prefix-sum scheduling
+
+- Replace the padded per-row group-ID layout with DeepGEMM's PSUM layout:
+  a GPU histogram counts all local routes, prefix scan gives each expert's
+  aligned begin and actual end, and atomic row allocation packs every route.
+- PSUM ends are computed fresh on every call. Tensor capacities remain based
+  only on shapes. Every selected local expert is retained, with an inverse
+  slot mapping for the same weighted per-expert normalization.
+- Zero only per-expert padding rows, including the post-SiLU buffer. No
+  input-value-based host branches, synchronization, or persistent data caches.
+- All custom kernels passed offline SM90 compilation under Triton 3.5.1.
+- Source SHA256: 427bce95be9d9e96d5645bdeec154d60a8883b3477e18f871096b4edec3bdbcf
+- Reason for check: attempt 3's ~17 ms grouped GEMM cost matches the padded
+  capacity; PSUM scheduling uses actual expert ranges to avoid this work.
+- Check: df0174a2efbc4524. Result: PASS five tests and eight timed shapes;
+  speedup 1.138786x (95% interval 1.121704-1.155868), no flags.
+  Score time 340190.3 us vs baseline 387403.9 us.
+  Four checks used, six left, two reserved.
+- Archived byte-identical source in attempt4.py; raw SHA256 matches the source
+  hash recorded before check 4. OKC server content keys differ from raw-file
+  SHA256 for all four attempts; they should not be compared directly.
+- First candidate recommended for submission. Awaiting explicit user approval;
+  no okc submit has been run.

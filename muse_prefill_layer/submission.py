@@ -294,25 +294,45 @@ def _expand_nvfp4(W, SF, GS, OUT, NK: tl.constexpr, BLOCK: tl.constexpr):
 
 
 @triton.jit
-def _pack_grouped(X, SORT, EXP, NP, PACK, LAYOUT, MAP,
-                  CAP: tl.constexpr, M: tl.constexpr, K: tl.constexpr, SLOTS: tl.constexpr):
-    block, colblock = tl.program_id(0), tl.program_id(1)
-    r = block * 128 + tl.arange(0, 128)
-    c = colblock * 128 + tl.arange(0, 128)
-    padded = tl.load(NP)
-    expert = -1
-    if block * 128 < padded:
-        expert = tl.load(EXP + block)
-    if colblock == 0:
-        tl.store(LAYOUT + r, expert, r < M)
+def _route_hist(IDS, COUNTS, SLOTS: tl.constexpr):
+    i = tl.program_id(0) * 1024 + tl.arange(0, 1024)
+    ids = tl.load(IDS + i, i < SLOTS, other=-1)
+    hist = tl.histogram(ids + 1, 64)
+    b = tl.arange(0, 64)
+    tl.atomic_add(COUNTS + b - 1, hist, (b > 0) & (b <= 32), sem="relaxed")
+
+
+@triton.jit
+def _route_prefix(COUNTS, PSUM, CURSOR):
+    e = tl.arange(0, 32)
+    count = tl.load(COUNTS + e)
+    padded = tl.cdiv(count, 128) * 128
+    begin = tl.cumsum(padded, 0) - padded
+    tl.store(PSUM + e, begin + count)
+    tl.store(CURSOR + e, begin)
+
+
+@triton.jit
+def _pack_routes(X, IDS, CURSOR, PACK, MAP, LAYOUT, K: tl.constexpr):
+    slot = tl.program_id(0)
+    expert = tl.load(IDS + slot)
     if expert >= 0:
-        slot = tl.load(SORT + r, (r < CAP) & (r < padded), other=SLOTS)
-        if colblock == 0:
-            tl.store(MAP + slot, r, slot < SLOTS)
-        a = tl.load(X + (slot[:, None] // 8) * K + c[None, :],
-                    (slot < SLOTS)[:, None] & (c < K)[None, :], other=0)
-        tl.store(PACK + r[:, None] * K + c[None, :], a,
-                 (r < M)[:, None] & (c < K)[None, :])
+        row = tl.atomic_add(CURSOR + expert, 1, sem="relaxed")
+        tl.store(MAP + slot, row)
+        tl.store(LAYOUT + row, expert)
+        col = tl.arange(0, K)
+        x = tl.load(X + (slot // 8) * K + col)
+        tl.store(PACK + row * K + col, x)
+
+
+@triton.jit
+def _zero_group_padding(PACK, PSUM, K: tl.constexpr):
+    end = tl.load(PSUM + tl.program_id(0))
+    r = end + tl.arange(0, 128)
+    c = tl.program_id(1) * 128 + tl.arange(0, 128)
+    aligned_end = tl.cdiv(end, 128) * 128
+    tl.store(PACK + r[:, None] * K + c[None, :], 0.0,
+             (r < aligned_end)[:, None] & (c < K)[None, :])
 
 
 @triton.jit
@@ -346,32 +366,36 @@ def _experts_grouped(x, topk_weights, topk_ids, state):
     # All weight expansion is inside the timed call; state retains NVFP4 only.
     t, k = x.shape
     local_ids = state["bank"]["expert_map"][topk_ids].contiguous()
-    sorted_ids, block_experts, padded = moe_align_block_size(local_ids, 128, LOCAL_EXPERTS)
-    cap = sorted_ids.numel()
-    m = triton.cdiv(cap, 128) * 128
+    # Capacity is shape-only; PSUM tells DeepGEMM the live expert ranges on GPU.
+    m = triton.cdiv(t * TOP_K + LOCAL_EXPERTS * 127, 128) * 128
     packed = torch.empty((m, k), device=x.device, dtype=x.dtype)
-    layout = torch.empty((m,), device=x.device, dtype=torch.int32)
+    layout = torch.full((m,), -1, device=x.device, dtype=torch.int32)
     mapping = torch.empty((t * TOP_K,), device=x.device, dtype=torch.int32)
-    _pack_grouped[(m // 128, triton.cdiv(k, 128))](
-        x, sorted_ids, block_experts, padded, packed, layout, mapping,
-        cap, m, k, t * TOP_K, num_warps=4)
+    counts = torch.zeros((LOCAL_EXPERTS,), device=x.device, dtype=torch.int32)
+    psum = torch.empty_like(counts)
+    cursor = torch.empty_like(counts)
+    _route_hist[(triton.cdiv(t * TOP_K, 1024),)](local_ids, counts, t * TOP_K, num_warps=4)
+    _route_prefix[(1,)](counts, psum, cursor, num_warps=4)
+    _pack_routes[(t * TOP_K,)](x, local_ids, cursor, packed, mapping, layout, k, num_warps=4)
+    _zero_group_padding[(LOCAL_EXPERTS, triton.cdiv(k, 128))](packed, psum, k, num_warps=4)
     bank = state["nvfp4"]
     w13 = torch.empty((LOCAL_EXPERTS, 2 * D_EXPERT, k), device=x.device, dtype=x.dtype)
     _expand_nvfp4[(triton.cdiv(2 * D_EXPERT * k, 2048), LOCAL_EXPERTS)](
         bank["w13"], bank["w13_sf"], bank["w13_gs"], w13, 2 * D_EXPERT * k, 2048,
         num_warps=4)
     hidden = torch.empty((m, 2 * D_EXPERT), device=x.device, dtype=x.dtype)
-    state["grouped_gemm"](packed, w13, hidden, layout)
+    state["grouped_gemm"](packed, w13, hidden, psum, use_psum_layout=True)
     del packed, w13
     inter = torch.empty((m, D_EXPERT), device=x.device, dtype=x.dtype)
     _grouped_silu[(m,)](hidden, inter, layout, D_EXPERT, num_warps=4)
     del hidden
+    _zero_group_padding[(LOCAL_EXPERTS, triton.cdiv(D_EXPERT, 128))](inter, psum, D_EXPERT, num_warps=4)
     w2 = torch.empty((LOCAL_EXPERTS, k, D_EXPERT), device=x.device, dtype=x.dtype)
     _expand_nvfp4[(triton.cdiv(k * D_EXPERT, 2048), LOCAL_EXPERTS)](
         bank["w2"], bank["w2_sf"], bank["w2_gs"], w2, k * D_EXPERT, 2048,
         num_warps=4)
     y = torch.empty((m, k), device=x.device, dtype=x.dtype)
-    state["grouped_gemm"](inter, w2, y, layout)
+    state["grouped_gemm"](inter, w2, y, psum, use_psum_layout=True)
     del inter, w2
     out = torch.empty_like(x)
     _grouped_finalize[(t,)](y, topk_weights, local_ids, mapping, state["post_expert_w"], out,
