@@ -131,3 +131,46 @@ correctness or performance result.
   Subsequent CLI calls use per-process GODEBUG=http2client=0 (HTTP/1.1),
   with no global configuration change.
 - Completed attempts 1-4 have each been committed with results and pushed.
+
+## Attempt 5: route tiles M=8 throughout
+
+- File: candidate_tiles8.py, based on checked attempt 4.
+- Only change: Marlin alignment/route block M=8 at every token count, rather
+  than M=16 above 16 tokens. Same FP32 reductions, precision and every route.
+- Motivation: attempt 3 measured substantial large-batch gains from smaller
+  tiles; M=8 may further reduce route padding and expose parallel blocks.
+- Local ast.parse passed. Check 4b019aca11194469: PASS, 13/13 tests, no flags.
+- Speedup 1.0304546x; 95% CI [1.0149978, 1.0459115]; score 21951.7670 us.
+- Source SHA256: bddbfa0c22105cfe904387caafce1e69b05e1d9194b7395ec4772b6ea3eaddd2.
+- Profile: profiles/candidate_tiles8.4b019aca11194469.txt.
+- Result: REGRESSION versus attempt 4. T=32 reaches 0.972-0.993x and
+  T=256 reaches 0.913-0.919x versus SGLang; T=128 loses its expert-tile gain.
+- Decision: reject uniform M=8. Keep M=16 above 16 tokens; smaller tiles lose
+  enough weight reuse to outweigh reduced padding at the large loads.
+- Fifth check today; 5 remained at dispatch, including 2 reserved.
+
+## Attempt 6: fuse BF16 high/low router projection
+
+- File: candidate_router.py, based on checked attempt 4 (M=16 expert tiles).
+- For 2-32 tokens, one split-K Triton kernel computes both BF16 hi/lo matrix
+  products with separate FP32 accumulators, followed by an FP32 reduction.
+- Use the BF16 FFN branch as the router input, as the permitted hi/lo router
+  path does. At T=1 retain the efficient FP32 GEMV; above 32 keep SGLang's pair.
+- Motivation: the T=8 profile spends roughly 22 us in FP32 router GEMMs.
+  Shape-specific dispatch avoids replacing T=1's roughly 5 us FP32 GEMV.
+- Router bias, sigmoid, top-8 selection and normalization retain SGLang's op.
+- All original FP32 router weights remain in state, with the allowed BF16
+  high/low pair. Both matrix accumulations and their reduction stay FP32.
+- Local ast.parse passed. Sixth check dispatched next; 4 remain afterward,
+  including 2 reserved. submission.py remains the approved attempt 4.
+
+## Approved scored entry for attempt 4
+
+- User explicitly approved one submit. Accepted job cda1f808b7754b1a.
+- PASS, 13/13 tests, no flags. Scored speedup 1.1137551x;
+  95% CI [1.0970488, 1.1304615]; score 20309.9398 us.
+- Profile: profiles/submission.cda1f808b7754b1a.txt.
+- Matches attempt 4 check (1.1134628x), confirming a gain above timing noise.
+- Current best checked and scored source: attempt 4 in submission.py (da14c66).
+- Runtime limits after dispatching attempt 6: 6 checks used, 4 left (2 reserved);
+  3 scored submissions used, 2 left.
