@@ -57,7 +57,7 @@ if hasattr(module, "_attention_parts"):
                                             LENS="*i32", KS="*fp32", VS="*fp32", PART="*fp32", LSE="*fp32"),
                     dict(HQ=16, HK=2, D=64, L=length, PAGE=page, PT_STRIDE=86008,
                          SPLITS=42, CHUNK=2048, **({"WINDOW": 0} if "WINDOW" in module._attention_parts.arg_names else {}), SCALE=0.6841258107984375, M=max(16, length * 8), N=getattr(module, "ATTENTION_N", 64)),
-                    num_warps=4, num_stages=2)
+                    num_warps=getattr(module, "ATTENTION_WARPS", 4), num_stages=getattr(module, "ATTENTION_STAGES", 2))
     for length, splits in ((1, 42), (8, 513)):
         compile_one("_combine_gate", dict(PART="*fp32", LSE="*fp32", QKV="*bf16", O="*bf16"),
                     dict(HQ=16, HK=2, D=64, L=length, STRIDE=2304, SPLITS=splits,
@@ -69,4 +69,4 @@ if hasattr(module, "_attention_parts") and "WINDOW" in module._attention_parts.a
                                         LENS="*i32", KS="*fp32", VS="*fp32", PART="*fp32", LSE="*fp32"),
                 dict(HQ=16, HK=2, D=64, L=8, PAGE=1, PT_STRIDE=86008,
                      SPLITS=17, CHUNK=128, WINDOW=2048, SCALE=0.6841258107984375, M=64, N=getattr(module, "ATTENTION_N", 64)),
-                num_warps=4, num_stages=2)
+                num_warps=getattr(module, "ATTENTION_WARPS", 4), num_stages=getattr(module, "ATTENTION_STAGES", 2))

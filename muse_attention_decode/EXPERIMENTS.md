@@ -91,7 +91,7 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 
 ## Attempt 3 scored submission and Git integration
 
-- User explicitly approved one submit; job `526d2f2d75ef4631` pending.
+- User explicitly approved one submit; job `526d2f2d75ef4631` PASS 16/16 at 1.28034635x SGLang.
 - Attempt commit `697eb8a`. Remote master diverged at `203f89f` (Create README.md).
   The user explicitly authorized preserving and merging that remote README outside
   the attention folder. The merge completed; no other project's source was edited.
@@ -106,3 +106,21 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   overhead, but not enough to compensate.
 - Offline resource reports show 218-249 registers/thread for the attention body,
   limiting occupancy. Next investigate launch warps/stages before another check.
+
+## Attempt 6 — native FP8 QK tensor cores
+
+- File: `candidates/attempt06_native_fp8_qk.py`; check `10f349ae95f842fd`: PASS 16/16, 1.29488362x, 95% CI [1.27546037, 1.31430688], score 2908.601 us.
+- Keep allowed FP8 query and key values directly in the QK dot product instead of
+  converting them exactly to BF16 first. FP32 scores/softmax/accumulation and BF16
+  probabilities/values for the weighted sum remain as before. No attention sparsity.
+- Offline SM90 compilation passes. Several warps/stages/smaller-tile drafts were
+  compiled but not remotely checked: resource reductions alone did not establish
+  enough expected benefit. All draft compiler files/caches stay in .tools/.
+- 5/10 checks used, 5 remain including 2 reserved. 2/5 scored runs used.
+
+- Attempt 6 decision: useful native FP8 gains, but do not submit universally.
+  Full decode B=1/16/32 improves to 20.80/162.46/300.10 us, and sliding cases
+  improve too. Full verify B=16/32 remains slower at 250.39/488.50 us than FA3
+  ~200/386 us. Next combine native FP8 with FA3 for batched full verify.
+- Attempt 3 scored run `526d2f2d75ef4631`: PASS 16/16, 1.28034635x,
+  95% CI [1.26114116, 1.30460614], score 2941.626 us. This remains the live best.
