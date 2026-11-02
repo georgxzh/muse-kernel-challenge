@@ -196,6 +196,9 @@ def _marlin_bank(weights):
 
 
 def prepare(weights):
+    from deep_gemm import m_grouped_bf16_gemm_nt_contiguous
+    native = {name: weights[name].clone() for name in
+              ("w13", "w13_sf", "w13_gs", "w2", "w2_sf", "w2_gs")}
     device = weights["qkv_gate"].device
     router = weights["router"]
     hi = router.to(torch.bfloat16)
@@ -228,6 +231,8 @@ def prepare(weights):
         # MuseSpark1xFp4Experts binds the post-expert norm's effective (1 + w) weight.
         "post_expert_w": post_expert._get_effective_weight().detach().to(torch.bfloat16),
         "bank": _marlin_bank(weights),
+        "nvfp4": native,
+        "grouped_gemm": m_grouped_bf16_gemm_nt_contiguous,
         "side_stream": torch.cuda.Stream(device),
         "_modules": (pre_ffn, next_pre_attn, post_attn, post_ffn, post_expert),
     }
@@ -238,6 +243,8 @@ def prepare(weights):
 
 def _experts(x, topk_weights, topk_ids, state):
     """MuseSpark1xFp4Experts._marlin_expert_outputs and its post-expert-norm finalize."""
+    if x.shape[0] >= 4096:
+        return _experts_grouped(x, topk_weights, topk_ids, state)
     bank = state["bank"]
     num_tokens, size_k = x.shape
     size_n = bank["size_n"]
@@ -248,8 +255,6 @@ def _experts(x, topk_weights, topk_ids, state):
         if num_tokens * TOP_K / LOCAL_EXPERTS / block_size_m < 0.9:
             break
     # Alignment only needs the 32 local expert bins; -1 marks nonlocal slots.
-    if num_tokens <= 2048:
-        block_size_m = 32
     sorted_ids, block_experts, n_padded = moe_align_block_size(local_ids, block_size_m, LOCAL_EXPERTS)
     cache2 = torch.empty((num_tokens * TOP_K, size_n), device=x.device, dtype=x.dtype)
     cache13 = torch.empty((num_tokens * TOP_K * max(gemm1_n, size_k),), device=x.device, dtype=x.dtype)
@@ -271,6 +276,107 @@ def _experts(x, topk_weights, topk_ids, state):
     return fused_post_expert_norm_weighted_sum(
         y, topk_weights, norm_weight=state["post_expert_w"], eps=POST_NORM_EPS, weight_first=True,
         slot_expert_ids=local_ids)
+
+
+@triton.jit
+def _expand_nvfp4(W, SF, GS, OUT, NK: tl.constexpr, BLOCK: tl.constexpr):
+    e = tl.program_id(1)
+    i = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    raw = tl.load(W + e * (NK // 2) + i // 2, i < NK, other=0).to(tl.int32)
+    code = (raw >> (4 * (i % 2))) & 15
+    mag = code & 7
+    bits = ((mag // 2 + 126) << 23) | ((mag & 1) << 22)
+    value = tl.where(mag < 2, mag.to(tl.float32) * 0.5, bits.to(tl.float32, bitcast=True))
+    value = tl.where((code & 8) != 0, -value, value)
+    sf = tl.load(SF + e * (NK // 16) + i // 16, i < NK, other=0).to(tl.float32)
+    gs = tl.load(GS + e)
+    tl.store(OUT + e * NK + i, (value * (sf * gs)).to(tl.bfloat16), i < NK)
+
+
+@triton.jit
+def _pack_grouped(X, SORT, EXP, NP, PACK, LAYOUT, MAP,
+                  CAP: tl.constexpr, M: tl.constexpr, K: tl.constexpr, SLOTS: tl.constexpr):
+    block, colblock = tl.program_id(0), tl.program_id(1)
+    r = block * 128 + tl.arange(0, 128)
+    c = colblock * 128 + tl.arange(0, 128)
+    padded = tl.load(NP)
+    expert = -1
+    if block * 128 < padded:
+        expert = tl.load(EXP + block)
+    if colblock == 0:
+        tl.store(LAYOUT + r, expert, r < M)
+    if expert >= 0:
+        slot = tl.load(SORT + r, (r < CAP) & (r < padded), other=SLOTS)
+        if colblock == 0:
+            tl.store(MAP + slot, r, slot < SLOTS)
+        a = tl.load(X + (slot[:, None] // 8) * K + c[None, :],
+                    (slot < SLOTS)[:, None] & (c < K)[None, :], other=0)
+        tl.store(PACK + r[:, None] * K + c[None, :], a,
+                 (r < M)[:, None] & (c < K)[None, :])
+
+
+@triton.jit
+def _grouped_silu(H, I, LAYOUT, D: tl.constexpr):
+    r = tl.program_id(0)
+    if tl.load(LAYOUT + r) >= 0:
+        c = tl.arange(0, D)
+        gate = tl.load(H + r * (2 * D) + c).to(tl.float32)
+        up = tl.load(H + r * (2 * D) + D + c).to(tl.float32)
+        y = (gate / (1.0 + tl.exp(-gate))) * up
+        tl.store(I + r * D + c, y.to(tl.bfloat16))
+
+
+@triton.jit
+def _grouped_finalize(Y, WEIGHTS, IDS, MAP, NORM, OUT, D: tl.constexpr):
+    tok = tl.program_id(0)
+    c = tl.arange(0, D)
+    norm = tl.load(NORM + c).to(tl.float32)
+    acc = tl.zeros((D,), tl.float32)
+    for k in tl.static_range(8):
+        slot = tok * 8 + k
+        if tl.load(IDS + slot) >= 0:
+            r = tl.load(MAP + slot)
+            y = tl.load(Y + r * D + c).to(tl.float32) * norm
+            y = y * tl.rsqrt(tl.sum(y * y, 0) / D + 1.e-8)
+            acc += y * tl.load(WEIGHTS + slot)
+    tl.store(OUT + tok * D + c, acc.to(tl.bfloat16))
+
+
+def _experts_grouped(x, topk_weights, topk_ids, state):
+    # All weight expansion is inside the timed call; state retains NVFP4 only.
+    t, k = x.shape
+    local_ids = state["bank"]["expert_map"][topk_ids].contiguous()
+    sorted_ids, block_experts, padded = moe_align_block_size(local_ids, 128, LOCAL_EXPERTS)
+    cap = sorted_ids.numel()
+    m = triton.cdiv(cap, 128) * 128
+    packed = torch.empty((m, k), device=x.device, dtype=x.dtype)
+    layout = torch.empty((m,), device=x.device, dtype=torch.int32)
+    mapping = torch.empty((t * TOP_K,), device=x.device, dtype=torch.int32)
+    _pack_grouped[(m // 128, triton.cdiv(k, 128))](
+        x, sorted_ids, block_experts, padded, packed, layout, mapping,
+        cap, m, k, t * TOP_K, num_warps=4)
+    bank = state["nvfp4"]
+    w13 = torch.empty((LOCAL_EXPERTS, 2 * D_EXPERT, k), device=x.device, dtype=x.dtype)
+    _expand_nvfp4[(triton.cdiv(2 * D_EXPERT * k, 2048), LOCAL_EXPERTS)](
+        bank["w13"], bank["w13_sf"], bank["w13_gs"], w13, 2 * D_EXPERT * k, 2048,
+        num_warps=4)
+    hidden = torch.empty((m, 2 * D_EXPERT), device=x.device, dtype=x.dtype)
+    state["grouped_gemm"](packed, w13, hidden, layout)
+    del packed, w13
+    inter = torch.empty((m, D_EXPERT), device=x.device, dtype=x.dtype)
+    _grouped_silu[(m,)](hidden, inter, layout, D_EXPERT, num_warps=4)
+    del hidden
+    w2 = torch.empty((LOCAL_EXPERTS, k, D_EXPERT), device=x.device, dtype=x.dtype)
+    _expand_nvfp4[(triton.cdiv(k * D_EXPERT, 2048), LOCAL_EXPERTS)](
+        bank["w2"], bank["w2_sf"], bank["w2_gs"], w2, k * D_EXPERT, 2048,
+        num_warps=4)
+    y = torch.empty((m, k), device=x.device, dtype=x.dtype)
+    state["grouped_gemm"](inter, w2, y, layout)
+    del inter, w2
+    out = torch.empty_like(x)
+    _grouped_finalize[(t,)](y, topk_weights, local_ids, mapping, state["post_expert_w"], out,
+                            k, num_warps=8)
+    return out
 
 
 @triton.jit

@@ -1,0 +1,158 @@
+{
+  "board": "muse_prefill_layer",
+  "call_id": "kc-85ebdf91944c47a4",
+  "cluster": "sfo3",
+  "content_hash": "91c04d0059fe2d8bbee7efc5ca36d29ca3359a4d997967e563b7adcd7831440e",
+  "created_at": 1793638429.2207859,
+  "dedicated": false,
+  "duplicate_of": null,
+  "finished_at": 1793639836.8544972,
+  "id": "85ebdf91944c47a4",
+  "mode": "check",
+  "output": {
+    "log": "/home/georg/muse-kernel-challenge/muse_prefill_layer/profiles/submission.85ebdf91944c47a4.log"
+  },
+  "payload_ref": "muse_prefill_layer/91c04d0059fe2d8bbee7efc5ca36d29ca3359a4d997967e563b7adcd7831440e.py",
+  "result": {
+    "checks": {
+      "flagged": [],
+      "ok": true,
+      "rejected": []
+    },
+    "error": null,
+    "evaluator": {
+      "code_sha256": "e4dd62811671d53e9ce60e07b83f3ae3a675576de1a18a0c29db60dd4b0d9905",
+      "files": {
+        "challenge/checks.py": "9a046c3c38db28b325dcd1557baecdf6bc9ef941d2175f9a900ba4c230bb8055",
+        "challenge/nvfp4.py": "cfdf37c7bc14b10f7353aba7d4632f4767401b92b4b073941a8030d9a961aaaf",
+        "configs/muse-spark-open.yaml": "60e242544d5f5a5fc143870461f7373b85accb677a536cb337581ded938c4a48",
+        "harness/eval.py": "0051a1bfac67a9f1fad06086b306653c6643b2bb253e15a794aa672312f070a9",
+        "harness/runner.py": "c905e5c80264c6d27620b6fc7d55b162dccdb8ed7282f8a513a4d2e6f2f226f2",
+        "harness/static_checks.py": "c5588b69e9e86229459a525c61b30096f6f13ff2add6cadf98f272c4ac8ca0c2",
+        "harness/worker.py": "950437610f57ddffbc1176b65d9c2ae909c47bf67b1e3fe0716a81946986f568",
+        "problems/muse_prefill_layer/baseline.py": "87d95a0c4b78f0fd6c772436b959330ca45652b10e82dfc8add9acf0549227d4",
+        "problems/muse_prefill_layer/reference.py": "23e177b87aee70c0d4990515989b95bff2972270cdac8ab967445b21fa2f5163",
+        "problems/muse_prefill_layer/task.yml": "901aec1ab2767d7d76d851e526aab6b285a59cf425b9bae9e1da7047d33f9feb"
+      },
+      "image": "localhost:30500/kc/judge@sha256:8c102d00529abd8b80898116ac64a9c8f66bbd256d56142be4b96fb626e89452"
+    },
+    "flags": [],
+    "gpu": "H200",
+    "log_tail": "Traceback (most recent call last):\n  File \"/opt/sglang/lib/python3.12/site-packages/triton/language/core.py\", line 43, in wrapper\n    return fn(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^\n  File \"/opt/sglang/lib/python3.12/site-packages/triton/language/core.py\", line 2540, in load\n    return _semantic.load(pointer, mask, other, boundary_check, padding_option, cache_modifier, eviction_policy,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/sglang/lib/python3.12/site-packages/triton/language/semantic.py\", line 1045, in load\n    other = self.cast(other, elt_ty)\n            ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/sglang/lib/python3.12/site-packages/triton/language/semantic.py\", line 916, in cast\n    assert False, f'cannot cast {input} to {dst_ty}'\n           ^^^^^\nAssertionError: cannot cast int32[constexpr[2048]] to <['2048'], fp8e4nv>\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/tmp/muse_prefill_layer-xlvc5_7t/run/worker.py\", line 484, in child_main\n    out = kernel()(state.get(\"data\"))\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/muse_prefill_layer-xlvc5_7t/run/worker.py\", line 415, in <lambda>\n    return functools.partial(lambda k, p, d: k(d, p), fn, state[\"prep\"])\n                                             ^^^^^^^\n  File \"/tmp/muse_prefill_layer-xlvc5_7t/run/submission.py\", line 482, in kernel_fn\n    expert_output = _experts(state[\"pre_expert_norm\"](expert_input), topk_weights, local_ids, state)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/muse_prefill_layer-xlvc5_7t/run/submission.py\", line 247, in _experts\n    return _experts_grouped(x, topk_weights, topk_ids, state)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/muse_prefill_layer-xlvc5_7t/run/submission.py\", line 360, in _experts_grouped\n    _expand_nvfp4[(triton.cdiv(2 * D_EXPERT * k, 2048), LOCAL_EXPERTS)](\n  File \"/opt/sglang/lib/python3.12/site-packages/triton/runtime/jit.py\", line 374, in <lambda>\n    return lambda *args, **kwargs: self.run(grid=grid, warmup=False, *args, **kwargs)\n                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/sglang/lib/python3.12/site-packages/triton/runtime/jit.py\", line 757, in run\n    kernel = self._do_compile(key, signature, device, constexprs, options, attrs, warmup)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/sglang/lib/python3.12/site-packages/triton/runtime/jit.py\", line 902, in _do_compile\n    kernel = self.compile(src, target=target, options=options.__dict__)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/sglang/lib/python3.12/site-packages/triton/compiler/compiler.py\", line 307, in compile\n    module = src.make_ir(target, options, codegen_fns, module_map, context)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/sglang/lib/python3.12/site-packages/triton/compiler/compiler.py\", line 80, in make_ir\n    return ast_to_ttir(self.fn, self, context=context, options=options, codegen_fns=codegen_fns,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntriton.compiler.errors.CompilationError: at 10:9:\ndef _expand_nvfp4(W, SF, GS, OUT, NK: tl.constexpr, BLOCK: tl.constexpr):\n    e = tl.program_id(1)\n    i = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)\n    raw = tl.load(W + e * (NK // 2) + i // 2, i < NK, other=0).to(tl.int32)\n    code = (raw >> (4 * (i % 2))) & 15\n    mag = code & 7\n    bits = ((mag // 2 + 126) << 23) | ((mag & 1) << 22)\n    value = tl.where(mag < 2, mag.to(tl.float32) * 0.5, bits.to(tl.float32, bitcast=True))\n    value = tl.where((code & 8) != 0, -value, value)\n    sf = tl.load(SF + e * (NK // 16) + i // 16, i < NK, other=0).to(tl.float32)\n         ^\ncannot cast int32[constexpr[2048]] to <['2048'], fp8e4nv>\n",
+    "machine": {
+      "gpu_after": {
+        "clocks.max.sm": 1980,
+        "clocks.mem": 3201,
+        "clocks.sm": 1980,
+        "driver_version": "595.91.07",
+        "name": "NVIDIA H200",
+        "power.draw": 124.64,
+        "power.limit": 700,
+        "temperature.gpu": 34
+      },
+      "gpu_before": {
+        "clocks.max.sm": 1980,
+        "clocks.mem": 3201,
+        "clocks.sm": 1980,
+        "driver_version": "595.91.07",
+        "name": "NVIDIA H200",
+        "power.draw": 142.93,
+        "power.limit": 700,
+        "temperature.gpu": 33
+      },
+      "node": "n-434neka4hbrvz7ee7sd46ord7g"
+    },
+    "passed": false,
+    "records": [
+      {
+        "baseline_copies": 2,
+        "baseline_prepare_pad": 27874816,
+        "copies": 1,
+        "error": null,
+        "event": "setup",
+        "first": "submission",
+        "prepare_pad": 29365248,
+        "prepare_s": 0.141818367,
+        "status": "pass"
+      },
+      {
+        "case": {
+          "batch": 1,
+          "ctx": 0,
+          "layer": "sliding",
+          "page": 1,
+          "q_len": 300,
+          "seed": 4821746225174094231
+        },
+        "event": "test",
+        "index": 0,
+        "message": "update relative L2 error 3.736e-02 (worst row 9.473e-02) [bound 0.070]; attention input relative L2 error 2.471e-02 (worst row 6.307e-02) [bound 0.046]",
+        "status": "pass"
+      },
+      {
+        "case": {
+          "batch": 1,
+          "ctx": 3000,
+          "layer": "full",
+          "page": 1,
+          "q_len": 753,
+          "seed": 4821968607310192434
+        },
+        "event": "test",
+        "index": 1,
+        "message": "update relative L2 error 6.736e-02 (worst row 1.128e-01) [bound 0.150]; attention input relative L2 error 4.422e-02 (worst row 8.244e-02) [bound 0.108]",
+        "status": "pass"
+      },
+      {
+        "case": {
+          "batch": 2,
+          "ctx": 2500,
+          "layer": "sliding",
+          "page": 1,
+          "q_len": 753,
+          "seed": 4822190989446290638
+        },
+        "event": "test",
+        "index": 2,
+        "message": "update relative L2 error 6.704e-02 (worst row 1.255e-01) [bound 0.150]; attention input relative L2 error 4.341e-02 (worst row 9.614e-02) [bound 0.105]",
+        "status": "pass"
+      },
+      {
+        "case": {
+          "batch": 3,
+          "ctx": 5000,
+          "dist": "outliers",
+          "layer": "full",
+          "q_len": 200,
+          "seed": 4822413371582388843
+        },
+        "event": "test",
+        "index": 3,
+        "message": "update relative L2 error 6.520e-02 (worst row 1.356e-01) [bound 0.150]; attention input relative L2 error 3.257e-02 (worst row 8.470e-02) [bound 0.080]",
+        "status": "pass"
+      },
+      {
+        "case": {
+          "batch": 1,
+          "ctx": 4096,
+          "layer": "sliding",
+          "page": 1,
+          "q_len": 4096,
+          "seed": 4822635753718487049
+        },
+        "event": "test",
+        "index": 4,
+        "message": "CompilationError: at 10:9:\ndef _expand_nvfp4(W, SF, GS, OUT, NK: tl.constexpr, BLOCK: tl.constexpr):\n    e = tl.program_id(1)\n    i = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)\n    raw = tl.load(W + e * (NK // 2) + i // 2, i < NK, other=0).to(tl.int32)\n    code = (raw >> (4 * (i % 2))) & 15\n    mag = code & 7\n    bits = ((mag // 2 + 126) << 23) | ((mag & 1) << 22)\n    value = tl.where(mag < 2, mag.to(tl.float32) * 0.5, bits.to(tl.float32, bitcast=True))\n    value = tl.where((code & 8) != 0, -value, value)\n    sf = tl.load(SF + e * (NK // 16) + i // 16, i < NK, other=0).to(tl.float32)\n         ^\ncannot cast int32[constexpr[2048]] to <['2048'], fp8e4nv>",
+        "status": "fail"
+      }
+    ],
+    "returncode": 112,
+    "score_us": null,
+    "speedup": null,
+    "speedup_ci": null,
+    "status": "ok"
+  },
+  "started_at": 1793639785.3094838,
+  "status": "done",
+  "team": "georgxzh"
+}

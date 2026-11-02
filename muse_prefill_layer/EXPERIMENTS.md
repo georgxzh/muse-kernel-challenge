@@ -51,3 +51,26 @@
 - Investigate skipping invalid alignment slots and Marlin block choice first.
 - If expert GEMMs dominate, evaluate on-the-fly NVFP4 dequantization with BF16
   grouped GEMMs; never persist expanded BF16 expert weights in prepare state.
+
+## Attempt 2 - grouped BF16 experts for long prefills
+
+- Keep attempt 1's fused QK/cache. Restore baseline Marlin M tiles on short
+  prefills, since M=32 did not improve measured short-prefill performance.
+- For >=4096 tokens, expand original NVFP4 experts to BF16 INSIDE kernel_fn,
+  pack routed activations into expert-aligned rows, and use DeepGEMM BF16
+  grouped GEMMs with FP32 accumulation. No expanded weights persist in state.
+- Align to 128 rows. Nonlocal blocks are represented by layout -1 and skipped.
+  Pack builds an inverse route-slot map; finalize reads grouped results directly,
+  applies each expert's post-norm and the original top-8 routing weights.
+- No attention, routing, or expert work is approximated or omitted.
+- Static validation: Python compilation and all 16 E2M1 nibble values passed.
+- Reason for check: profile shows 10.5-11.6 ms in Marlin on 16K prefills; timed
+  dequantization plus BF16 WGMMA should reduce this despite expanded-weight I/O.
+- Source SHA256: 95aadfaf306a85c41ed419abdd765f6937aa65299def80b7889b74274693629d
+- Check: 85ebdf91944c47a4. Result: FAILED at the 4096-token test.
+  Triton compilation rejected integer other=0 in the FP8 scale load:
+  cannot cast int32[2048] to fp8e4nv. Four smaller tests passed. No timing
+  result or flags. Two checks spent, eight left, two reserved.
+- Next fix: use a floating-point zero fallback for the FP8 scale load.
+- Initial requests failed with transient network errors; using
+  GODEBUG=http2client=0 resolved the HTTP/2 protocol failure.
