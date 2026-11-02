@@ -191,7 +191,14 @@ correctness or performance result.
 - Router remains SGLang's; this test isolates route-tile performance from
   the still-running attempt 6 router experiment.
 - Same weights, precision, FP32 reductions, norms, and complete routing.
-- Local ast.parse passed. Check 877b103cc2b240ec: queued.
+- Local ast.parse passed. Check 877b103cc2b240ec: PASS, 13/13 tests, no flags.
+- Speedup 1.1116475x; 95% CI [1.0949728, 1.1283222]; score 20348.4461 us.
+- Source SHA256: f11e23c4b31138659062db000985e205f284379327748a0f063336317aca7722.
+- Profile: profiles/candidate_tiles32.877b103cc2b240ec.txt.
+- M=32 reduces T=128 gains (1.128-1.166x versus attempt 4 1.171-1.236x),
+  but T=256 reaches 1.124-1.208x versus attempt 4 1.107-1.148x.
+- Decision: do not promote as-is. Test M=16 through T=128 and M=32 above
+  that, combined with attempt 6 router fusion, as the final non-reserve check.
 - Seventh check today; 3 remain, including 2 reserved.
 - submission.py promoted separately to checked attempt 6; this check tests the
   original attempt-4 base independently so the tile effect can be assessed.
