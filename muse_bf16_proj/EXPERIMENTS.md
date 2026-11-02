@@ -27,3 +27,33 @@
 - Profile: router improves 1.789x / 2.610x at m=1/8 and 1.305-1.339x at m=16/32/128. The projection split-K path regresses most at m=32 (o 0.693x, unpooler 0.719x); restore cuBLAS there before more aggressive tuning.
 - Frozen checked source: `attempts/attempt01.py` (byte-for-byte copy). Recommend early scored submission of this file, pending the user's explicit approval.
 - Daily budget after this check: 1/10 checks used, 9 left (2 reserved); 0/5 scored runs used.
+
+## Attempt 1 scored submission
+
+- User explicitly approved submitting attempt 1.
+- Scored job `194f20ddef5446e0` submitted from frozen `attempts/attempt01.py`; result pending.
+
+## Attempt 2 - measured dispatch and router occupancy
+
+- Restore cuBLAS for qkv_gate and o, and for larger unpooler/pooler batches where attempt 1 regressed.
+- Keep split-K for small pooler and sliced unpooler, which showed modest improvements.
+- Router: use hi/lo tensor cores for m >= 2, narrower N tiles, larger M tiles for large batches, and split-K chosen to provide roughly a full GPU wave. Tiny m=1 still uses full-FP32 GEMV.
+- Rationale: remove observed projection regressions and improve the underoccupied router (attempt 1 had only 32 CTAs at m=16).
+- The exact checked attempt 1 remains untouched in `attempts/attempt01.py`.
+
+## Attempt 3 - lossless BF16 exponent packing
+
+- Independent follow-on based on frozen attempt 2; candidate `attempts/attempt03.py`.
+- Store sign + seven mantissa bits in one byte and exponent codes in packed nibbles (12 bits/weight for the common path). Code zero escapes to the original BF16 weight; reconstruction is bit-exact, with no rounding or skipped values.
+- Prepare derives all packing only from supplied weights; `.item()` is confined to untimed prepare. Timed calls decode on GPU and still consume fresh activations.
+- CPU validation: `validate_packing.py` exhaustively reconstructs all 65,536 BF16 bit patterns at nine exponent bases, and all pairs of exponent nibbles: PASS. This includes zeros, subnormals, infinities and NaN bit patterns via the exact escape representation.
+- Larger M tiles avoid loading weights twice at m=32; K=1024 uses a single pass directly into the output, eliminating split reduction.
+- Larger projection batches retain cuBLAS. Router path remains attempt 2's independent tuning.
+- Local Python syntax passes. Remote check requested (third check); result pending.
+
+### Attempt 1 scored result
+
+- Job `194f20ddef5446e0`: PASS, speedup **1.0388608x**, 95% CI **1.0232779-1.0544437x**. The first correct, faster-than-baseline leaderboard entry is secured.
+- Difference from its 1.0473x check is within the reported uncertainty.
+- Exactly the frozen source `attempts/attempt01.py` was submitted after explicit user approval.
+- One scored submission requested/used; four of five daily scored submissions remain. Two follow-on checks remain queued.
