@@ -1,2 +1,2 @@
 # Full raw profiles remain local; compact text reports are tracked.
-profiles/*.json
+**/profiles/*.json

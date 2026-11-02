@@ -90,21 +90,23 @@ def kernel_fn(data: Inputs, state) -> torch.Tensor:
     x, cfg = data["x"], data["config"]
     m, n, k, layer = cfg["m"], cfg["n"], cfg["k"], cfg["layer"]
     router = layer == "router"
-    if not router and m > 32:
+    if not router and (layer in ("qkv_gate", "o") or m > 16 or (layer == "unpooler" and m > 8)):
         return torch.mm(x, state[layer][:n].T)
-    split = 8 if k >= 4096 else 4
+    split = (16 if m <= 32 else 8 if m <= 128 else 4) if router else (8 if k >= 4096 else 4)
+    bm = (16 if m <= 16 else 32 if m <= 32 else 64) if router else 16
+    bn = 32 if router else 64
     out = torch.empty((m, n), device=x.device,
                       dtype=torch.float32 if router else torch.bfloat16)
     partial = torch.empty((split, m, n), device=x.device, dtype=torch.float32)
-    if router and m <= 8:
+    if router and m == 1:
         _router_small[(m, triton.cdiv(n, 4), split)](
             x, state["router"], partial, m, n, k, split, 4, k // split,
             num_warps=4)
     else:
         w = state["router_hi"] if router else state[layer]
         lo = state["router_lo"] if router else w
-        _split_mm[(triton.cdiv(m, 16), triton.cdiv(n, 64), split)](
-            x, w, lo, partial, m, n, k, split, router, 16, 64, 64,
+        _split_mm[(triton.cdiv(m, bm), triton.cdiv(n, bn), split)](
+            x, w, lo, partial, m, n, k, split, router, bm, bn, 64,
             num_warps=4, num_stages=3)
     _finish[(triton.cdiv(m * n, 256),)](partial, out, m * n, split, 256)
     return out

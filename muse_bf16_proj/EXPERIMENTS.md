@@ -57,3 +57,10 @@
 - Difference from its 1.0473x check is within the reported uncertainty.
 - Exactly the frozen source `attempts/attempt01.py` was submitted after explicit user approval.
 - One scored submission requested/used; four of five daily scored submissions remain. Two follow-on checks remain queued.
+
+### Attempt 2 result
+
+- Check job `54d88712677b4685`: PASS, all correctness and timed cases; **1.1270414x** SGLang, 95% CI **1.1101358-1.1439471x**.
+- Frozen checked source: `attempts/attempt02.py`. Main `submission.py` currently matches this version.
+- Removing measured projection regressions and improving router occupancy gives a clear improvement over the first scored 1.0389x entry. Recommend submitting attempt 2 with explicit user permission.
+- Third check `faf23be693794770` remains queued. Total checks requested today: 3; seven left, including the two-check reserve. Four scored submissions remain.
