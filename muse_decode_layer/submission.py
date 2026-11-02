@@ -320,7 +320,7 @@ def _experts(x, topk_weights, topk_ids, state):
     local_ids = topk_ids
     topk_weights = topk_weights.to(torch.float32).contiguous()
     # Route tiles measured in attempt 3, preserving every route.
-    block_size_m = 8 if num_tokens <= 16 else 16
+    block_size_m = 8 if num_tokens <= 16 else (16 if num_tokens <= 128 else 32)
     sorted_ids, block_experts, n_padded = moe_align_block_size(local_ids, block_size_m, N_EXPERTS)
     cache2 = torch.empty((num_tokens * TOP_K, size_n), device=x.device, dtype=x.dtype)
     cache13 = torch.empty((num_tokens * TOP_K * max(gemm1_n, size_k),), device=x.device, dtype=x.dtype)

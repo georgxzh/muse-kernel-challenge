@@ -96,7 +96,8 @@ correctness or performance result.
 
 ## Prepared candidate: fuse pre-expert norm and local-route mapping
 
-- File: candidate_expert_prep.py, currently based on attempt 1 independently.
+- Initially prepared independently as candidate_expert_prep.py; its code was
+  folded into attempt 4 and the unused standalone prototype was removed.
 - Fuse the 4096-channel RMSNorm with mapping global expert IDs to local 0-31
   (or -1 for nonlocal), replacing separate subtraction, modulo, expert-map
   lookup and normalization launches. Retain all routes and their weights.
@@ -202,3 +203,54 @@ correctness or performance result.
 - Seventh check today; 3 remain, including 2 reserved.
 - submission.py promoted separately to checked attempt 6; this check tests the
   original attempt-4 base independently so the tile effect can be assessed.
+
+## Attempt 8: router fusion with measured shape-based expert tiles
+
+- File: candidate_final.py, based on checked attempt 6.
+- QK/cache fusion, BF16 split-K dense projections at T<=8, fused pre-expert
+  norm/local mapping, permitted BF16 hi/lo router fusion for 2-32 tokens.
+- Expert tiles: M=8 for T<=16, M=16 through T=128, M=32 above T=128.
+- Combines measured M=16 advantage at T=128 with measured M=32 advantage
+  at T=256. Shape dispatch applies generally, with every route still computed.
+- Local ast.parse passed. Only dispatch if live check budget exceeds 2.
+- Check 226b8fff3e7c46ec: PASS, 13/13 tests, no flags.
+- Speedup 1.1514327x; 95% CI [1.1341612, 1.1687042]; score 19645.3508 us.
+- Source SHA256: 25745660cab7273dd135e2ff0c9a1400697413f0451c4c9067e8e40dcbe79243.
+- Profile: profiles/candidate_final.226b8fff3e7c46ec.txt.
+- Every timed shape faster than SGLang: 1.039-1.261x.
+- Decision: promote exact checked candidate to submission.py; recommend
+  final scored update with user approval. Gain over scored attempt 6 is
+  modest and confidence intervals overlap.
+- Eighth and final non-reserve check today; exactly 2 checks remain untouched.
+- submission.py now holds this exact checked candidate; previous scored
+  source remains in candidate_router.py and commit 5961b8d.
+
+## Approved scored entry for attempt 6
+
+- User explicitly approved one submit. Accepted job db5931ab057149c2.
+- PASS, 13/13 tests, no flags. Scored speedup 1.1367534x;
+  95% CI [1.1197021, 1.1538047].
+- Profile: profiles/submission.db5931ab057149c2.txt.
+- Current submitted best: attempt 6, source commit 5961b8d.
+- Quota: 8 checks used, 2 reserved; 4 scored runs used, 1 left. No further
+  check today before the UTC reset, honoring the user's reserve requirement.
+- Generated verbose JSON/log profiles stay on disk but are ignored; readable
+  timing profiles for every completed attempt are committed with the source.
+
+## Current status after attempt 8
+
+| Attempt | Main change | Check speedup | Correctness | Decision |
+|---|---|---:|---|---|
+| 1 | Fused QK/cache writes | 1.0137x | 13/13 | Scored 1.0148x |
+| 2 | Split-K through T=32 | 1.0200x | 13/13 | Restrict to T<=8 |
+| 3 | Expert route tiles M=16 | 1.0689x | 13/13 | Scored 1.0591x |
+| 4 | Combined + expert preparation | 1.1135x | 13/13 | Scored 1.1138x |
+| 5 | Uniform expert tiles M=8 | 1.0305x | 13/13 | Rejected regression |
+| 6 | Fused BF16 hi/lo router | 1.1310x | 13/13 | Scored 1.1368x |
+| 7 | Expert tiles M=32 above T=32 | 1.1116x | 13/13 | Use only above T=128 |
+| 8 | Router + measured expert tiles | 1.1514x | 13/13 | Best checked; await submit approval |
+
+- All work is inside muse_decode_layer on master. Every attempt is committed
+  with its result and pushed; only explicit decoder paths are staged.
+- Never rerun okc check before UTC reset: 2 checks are reserved.
+- One scored submission remains today; every submit requires fresh user approval.
