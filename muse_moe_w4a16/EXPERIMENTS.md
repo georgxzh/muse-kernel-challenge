@@ -162,6 +162,10 @@ Work is confined to this problem on `master`. Other chats share the repository.
   BM16; >32 use BM64. Small token batches still retain attempt 3.
 - NVFP4 weights, BF16 activations, and FP32 reductions are unchanged.
 - Python syntax and offline SM90 compilation passed for every target size.
-- Remote check: `c2def1a570fd4209` (pending).
+- Remote check: `c2def1a570fd4209`: PASS, all 5 tests and 6 timed shapes.
+- Speedup **1.349124x**, CI [1.328887, 1.369361], score 9968.32 us.
+- M128 325.76 us vs 467.87 baseline (1.436x); M256 419.49 us vs 617.81
+  baseline (1.473x). Slower than attempt 6 on both large scored shapes;
+  retain attempt 6. Snapshot `attempts/attempt_07.py`.
 - Checks used after launch: 7; remaining: 3. At most one more check may be
   used today; two checks remain reserved. Scored submissions remaining: 3.
