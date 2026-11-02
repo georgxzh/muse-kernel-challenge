@@ -48,4 +48,40 @@ correctness or performance result.
   full decode (up to 60%). Small-batch dense projections also take material time.
 - Recommendation: bank the passing candidate early, with user approval, while
   continuing checks for a more decisive improvement.
-- No scored submission authorized or performed.
+- At the initial check: no scored submission had been authorized or performed.
+
+## Approved scored entry for attempt 1
+
+- User explicitly approved this one submit in chat.
+- Job: ead6ef40d45f4304. PASS, 13/13 tests, no flags.
+- Scored speedup 1.0148404x, 95% CI [0.9996178, 1.0300631].
+- Profile: profiles/submission.ead6ef40d45f4304.txt.
+- Source: submission.py from a7ab50c; first scored submission today (4 remain).
+
+## Attempt 2: BF16 split-K dense projections, up to 32 tokens
+
+- File: candidate_splitk.py, based on attempt 1.
+- Four projection calls use BF16 tensor-core dot products with FP32 accumulation
+  and FP32 split reduction, followed by the usual BF16 output. Larger batches
+  retain SGLang dispatch. Router, attention, and experts unchanged.
+- Static tiles M=16/32, N=64, K=128; 8 K splits for K>=4096, otherwise 4.
+- Motivation: profile shows small-batch dense kernels take material time.
+- Local syntax validation passed. No local GPU measurement.
+- Check 52a6ea3eb69443be: PASS, 13/13 tests, no flags.
+- Speedup 1.0200123x; 95% CI [1.0047121, 1.0353125]; score 22176.4970 us.
+- Source SHA256: 77cc09853a54f6faa8d7de6d4b07ece7248a8a77be569593e9acdf091d551308.
+- Profile: profiles/candidate_splitk.52a6ea3eb69443be.txt.
+- Shape results: T=1 1.029-1.034x, T=8 1.099-1.106x; T=16/32 regresses
+  to 0.980-0.990x. Larger batches unchanged beyond QK fusion.
+- Decision: retain as an experiment; future combinations restrict split-K to
+  T<=8. Do not promote this all-small-batch version.
+- Second check today; 8 remained at dispatch, 2 reserved.
+
+## Prepared candidate: smaller Marlin route tiles
+
+- File: candidate_moe_tiles.py, based on attempt 1 independently of attempt 2.
+- Use route block M=8 up to 16 tokens, M=16 above that, reducing the baseline's
+  M=48/64 padding and exposing more parallel work for large batches.
+- The first profile shows expert GEMMs take up to 75% of sliding verify time.
+- Same route alignment, expert weights, activations, FP32 reduction, and norms.
+- Local syntax validation passed. Not checked yet.
