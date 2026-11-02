@@ -113,3 +113,31 @@ A candidate is verified better when its changed shapes beat noise (over 3%), no 
 Changed shapes count as one group. A candidate is verified better when the group gains overall, no single shape regresses by more than 3%, and overall speedup is higher, even if intervals overlap. Scored submissions still need explicit user approval.
 
 - Attempt 5 under this rule: **still not verified better.** The group gains +6.4% by geometric mean, but qkv_gate m=32 (-5.9%) and router m=1 (-4.1%) each drop more than 3%.
+
+## Attempt 6 - attempt 5 without qkv_gate m=32, tiling extended
+
+- Candidate `attempts/attempt06.py`, built from attempt 5. `submission.py` stays at attempt 2.
+- qkv_gate m=17-32 returns to cuBLAS (attempt 2's path), removing the -5.9% regression.
+- Tiled weights extended to pooler m<=16 and unpooler m<=8, replacing their row-major `_split_mm` path with identical tile parameters (BM=16, BN=64, BK=64, split 8).
+- Router and transposed-weight changes are unchanged from attempt 5.
+- Local validation (scratchpad only): 39/39 under the CPU mock with `reference.py`; all stored weight copies bit-exact; offline compile passes on Triton 3.5.0 and 3.5.1.
+- Check `97c95b793b9a4867` requested with user approval. Sixth check of the day; four left, two of them reserved.
+
+### Attempt 6 result
+
+- PASS 9/9 and all timed shapes, no flags: **1.1524x**, CI 1.1351-1.1697, overlapping attempt 2's 1.1122-1.1461. Level with attempt 5's 1.1513x.
+- **Not verified better as the rule is written; `submission.py` stays at attempt 2.** The 13-shape group gains +4.7% and overall speedup is higher, but one shape crosses -3% on each baseline: o m=256 -3.3% against the attempt 2 mean, qkv_gate m=128 -3.4% against the attempt 2 scored run. Neither shape's code changed from attempt 2.
+- Identical code has spread that much on those shapes: o m=256 ran 1.021, 0.990, 0.976, 0.972 across attempts 2, 2, 5, 6; qkv_gate m=128 ran 1.010, 1.024, 1.014, 0.989.
+- Reproduced gains: router m=256 +30-35% (attempts 5, 6); pooler m=128 +10-12% (attempts 4, 5, 6); unpooler m=128 +4-6% (attempts 4, 5, 6).
+- Tiling gained less than estimated. pooler m<=16 +2.6-3.3%, unpooler m<=8 +0.6-2.7%, against an expected 10%. qkv_gate m<=16 fell back from attempt 5's +2.6-4.3% to -0.3 to +2.6%, on identical code, so its gain over cuBLAS is not established. Against the row-major control it is about 6-10%.
+- Overall result missed the 1.17x estimate.
+
+### Attempt 6 scored run
+
+- The user treated the two -3% shapes as noise, since their code is unchanged, and approved one scored run. The board keeps each team's best run.
+- Scored job `c0a7d84f19104a4a`: PASS 9/9, no flags, **1.1466x**, CI 1.1294-1.1638, rank 1363 of 1645. Same `content_hash` as check `97c95b793b9a4867` (`f3a900a0...`).
+- Above attempt 2's 1.1292x, so `submission.py` now matches `attempts/attempt06.py`. The intervals overlap.
+- Per shape against the attempt 2 mean: group +4.4%. router m=1 -3.7%, the only shape past -3%. Against the attempt 2 scored run alone, router m=1 -4.5%, qkv_gate m=16 -3.5%, m=32 -3.3%, m=128 -3.2%.
+- router m=1 uses unchanged code but ran 1.853, 1.881, 1.791, 1.844, 1.797 across attempts 2, 2, 5, 6, 6. Its two lowest readings are in the two runs of this session's later code, so a small real loss is not ruled out.
+- Reproduced again: router m=256 +34.9%, pooler m=128 +10.4%, unpooler m=128 +3.6%.
+- Budget after this run: 4 checks left (2 above the reserve), 2 scored runs left.
