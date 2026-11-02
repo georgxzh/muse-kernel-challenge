@@ -118,6 +118,56 @@ def _post_norm_sum(Y, Scores, Norm, Ids, Out,
     tl.store(Out + t * H + h, acc, h < H)
 
 
+@triton.jit
+def _align_local_routes(Ids, Local, Sorted, Experts, Total,
+                        N: tl.constexpr, START: tl.constexpr,
+                        E: tl.constexpr, BM: tl.constexpr,
+                        NP: tl.constexpr, NE: tl.constexpr, NB: tl.constexpr):
+    # Each local expert owns a disjoint padded segment. The small histogram
+    # supplies identical segment boundaries to all CTAs without global atomics.
+    expert = tl.program_id(0)
+    p = tl.arange(0, NP)
+    ids = tl.load(Ids + p, p < N, other=-1) - START
+    valid = (p < N) & (ids >= 0) & (ids < E)
+    if expert == 0:
+        tl.store(Local + p, tl.where(valid, ids, -1), p < N)
+    own = valid & (ids == expert)
+    count = tl.sum(own.to(tl.int32), 0)
+    if (count > 0) | (expert == 0):
+        hist = tl.histogram(tl.where(valid, ids, 0), NE, mask=valid)
+        padded = tl.cdiv(hist, BM) * BM
+        e = tl.arange(0, NE)
+        base = tl.sum(tl.where(e < expert, padded, 0), 0)
+        if expert == 0:
+            tl.store(Total, tl.sum(padded, 0))
+        n_pad = tl.cdiv(count, BM) * BM
+        # Fill and scatter are separated by a CTA barrier: different warps
+        # may otherwise overwrite a real pair with its padding sentinel.
+        tl.store(Sorted + base + p, N, p < n_pad)
+        tl.debug_barrier()
+        rank = tl.cumsum(own.to(tl.int32), 0) - 1
+        tl.store(Sorted + base + rank, p, own)
+        b = tl.arange(0, NB)
+        tl.store(Experts + base // BM + b, expert, b < n_pad // BM)
+
+
+def _align_local(ids, cfg, bm):
+    n = ids.numel()
+    count = cfg["local_count"]
+    capacity = min(n * bm, n + count * (bm - 1))
+    local = torch.empty_like(ids)
+    sorted_ids = torch.empty((capacity,), dtype=torch.int32, device=ids.device)
+    experts = torch.empty((triton.cdiv(capacity, bm),), dtype=torch.int32, device=ids.device)
+    total = torch.empty((1,), dtype=torch.int32, device=ids.device)
+    _align_local_routes[(count,)](
+        ids, local, sorted_ids, experts, total,
+        N=n, START=cfg["local_start"], E=count, BM=bm,
+        NP=triton.next_power_of_2(n), NE=triton.next_power_of_2(count),
+        NB=triton.next_power_of_2(triton.cdiv(n, bm)),
+        num_warps=4,
+    )
+    return local, sorted_ids, experts, total
+
 def kernel_fn(data, state):
     cfg = data["config"]
     bank = state["banks"][(cfg["local_start"], cfg["local_count"])]
@@ -127,22 +177,11 @@ def kernel_fn(data, state):
     gemm1_n = 2 * size_n
     expert_map = bank["expert_map"]
 
-    local_ids = data["topk_ids"].to(torch.int32)
-    if expert_map is not None:
-        local_ids = expert_map[local_ids]
-    local_ids = local_ids.contiguous()
-    topk_weights = data["topk_weights"].to(torch.float32).contiguous()
-
-    # EP computes only a share of the global routes. Avoid large, mostly
-    # padded matrix tiles chosen from the total (including remote) routes.
+    # Fused mapping/alignment excludes remote routes from Marlin's schedule.
     block_size_m = 8 if num_tokens <= 32 else 16
-    if num_tokens == 1 and expert_map is None:
-        from sglang.kernels.ops.moe.moe_align_single_token import moe_align_single_token
-
-        sorted_ids, block_experts, n_padded = moe_align_single_token(local_ids, block_size_m)
-    else:
-        sorted_ids, block_experts, n_padded = moe_align_block_size(
-            local_ids, block_size_m, bank["count"])
+    local_ids, sorted_ids, block_experts, n_padded = _align_local(
+        data["topk_ids"], cfg, block_size_m)
+    topk_weights = data["topk_weights"].to(torch.float32).contiguous()
 
     cache2 = torch.empty((num_tokens * TOP_K, size_n), device=x.device, dtype=x.dtype)
     cache13 = torch.empty((num_tokens * TOP_K * max(gemm1_n, size_k),), device=x.device, dtype=x.dtype)

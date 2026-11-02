@@ -82,7 +82,7 @@ Work is confined to this problem on `master`. Other chats share the repository.
 - Buffer capacity is min(N * BM, N + local_count * (BM - 1)), where N=M*8.
   Both expressions bound the sum of per-expert padded counts for any routing.
 - Python syntax compilation: passed. No local GPU runtime available.
-- Remote check: `d3779b6e54304b26` (pending).
+- Remote check: `d3779b6e54304b26`: PASS, 1.344003x, CI [1.323843, 1.364163].
 - Snapshot: `attempts/attempt_03.py`; attempt 2 also saved separately.
 - Checks spent: 3; expected remaining: 7. Scored submissions spent: 1.
 
@@ -93,3 +93,17 @@ Work is confined to this problem on `master`. Other chats share the repository.
 - Scored job `e0f116ab0de94c44`: PASS 5/5, **1.3355x**, CI 1.3155-1.3556, no flags. Rank 1040 of 1316.
 - Its `content_hash` equals the check's (`9629a886...`), so the scored run is the code that passed the check.
 - `submission.py` remains at attempt 2; the scored run used the frozen attempt 3 file. Scored runs left today: 3. Checks left: 7.
+
+## Attempt 3 verification and promotion in this chat
+
+- Our offline Triton 3.5 SM90 compile passed for routing M=1,4,8,16,32,33,
+  128,256,257 and the fused post norm; no local GPU was used.
+- Check `d3779b6e54304b26`: all 5 tests and 6 timed shapes pass, no flags;
+  score 10006.31 us. Per-shape baseline / candidate us: M1 80.50 / 51.02;
+  M16 187.92 / 146.39; M32 210.26 / 203.79; M8 153.25 / 114.73;
+  M128 459.60 / 313.42; M256 623.73 / 433.19.
+- Another process committed the frozen candidate and recorded scored run
+  `e0f116ab0de94c44` with user approval in commit `6dcba10`. This chat did
+  not launch that submission and will not duplicate it.
+- Promoted the checked frozen attempt 3 to `submission.py`.
+- Confirmed CLI quota: 7 checks and 3 scored submissions remaining.
