@@ -185,7 +185,9 @@ Work is confined to this problem on `master`. Other chats share the repository.
 - No overall improvement over attempt 6. Retain attempt 6 as the final entry.
 - Checks used: 8; **2 checks reserved. No more checks today.**
 - Attempt 6 remains active. User explicitly approved one scored submission
-  of frozen `attempts/attempt_06.py`; job `aa4935c3095c450d` is pending.
+  of frozen `attempts/attempt_06.py`; job `aa4935c3095c450d` passed all 5 correctness tests and 6 timed shapes.
+- Final scored speedup: **1.361666x**, CI [1.341241, 1.382091],
+  score 9876.50 us. The checked frozen attempt 6 was submitted unchanged.
 - Scored submissions used: 3; remaining: 2.
 
 ## Final selection
@@ -198,3 +200,14 @@ Work is confined to this problem on `master`. Other chats share the repository.
   Only weight packing runs in prepare; fresh routing and activations are
   computed entirely within CUDA-graph-capturable timed calls.
 - Daily checks used: 8/10. The final 2 checks are reserved.
+
+## Final scored result
+
+- Approved scored attempt 6: `aa4935c3095c450d`, PASS, **1.361666x** SGLang.
+- Check speedup 1.366962x and scored speedup 1.361666x agree within their
+  reported confidence intervals. No further tuning or submissions planned today.
+- Active entry: `submission.py`, byte-identical to `attempts/attempt_06.py`.
+- All eight attempts are logged and committed with result evidence.
+- Budget: 8/10 checks used, **2 reserved**; 3/5 scored submissions used,
+  **2 remaining**. Every scored submission launched by this chat had explicit
+  user approval; the separate attempt-3 submission is documented above.
