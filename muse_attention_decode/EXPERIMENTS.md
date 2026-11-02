@@ -1,5 +1,20 @@
 # Attention decode experiments
 
+## Current status (2026-11-02)
+
+- Best scored: **1.38346370x SGLang**, job `a4b548ad9d744089`, PASS 16/16.
+- Current kernel: `submission.py`, byte-identical to `candidates/attempt07_hybrid.py`.
+- 95% speedup CI [1.36271175, 1.40421566]; equivalent score 2722.370 us.
+- Started with a submitted 1.11109588x fused-FA3 entry, improved to a submitted
+  1.28034635x custom-sliding entry, then to the current native-FP8/FA3 hybrid.
+- Today: 6/10 checks used (4 left, including 2 reserved), 3/5 scored submissions
+  used (2 left). Ask before every additional submit. No checks/submits pending.
+- Current hybrid retains FA3 for batched full verify and uses custom native FP8 QK,
+  FP32 online softmax/accumulation and BF16 PV elsewhere. All keys in each context
+  or window are included; no value skipping, tensor-derived caching, or host sync.
+- Passing check's largest test relative-error/bound ratio was 0.6468; static
+  rule checks reported no flags or rejections. Scored rerun also passed all tests.
+
 Scope: only `muse_attention_decode`, on shared `master`. Never stage other problems.
 Rules reviewed 2026-11-02: https://openkernelchallenge.dev/rules and local TASK.md/AGENTS.md.
 AI assistance is permitted. Every required key participates; no cached input-derived results,
@@ -139,3 +154,11 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 
 - Attempt 7 95% CI: [1.35523045187781, 1.4024870769109], score 2737.39827411617 us.
 - Decision: recommend immediate scored submission; fresh user approval pending.
+
+## Attempt 7 scored submission
+
+- User explicitly approved one submit of exact commit `5e9e7c7` candidate.
+- Job `a4b548ad9d744089`: PASS 16/16, 1.38346370x, 95% CI [1.36271175, 1.40421566], score 2722.370 us. Source commit confirmed pushed to remote master.
+- Current `submission.py` is byte-identical to `candidates/attempt07_hybrid.py`.
+- Today's usage: 6/10 checks, 3/5 scored submissions. 4 checks remain, with 2
+  reserved; 2 scored submissions remain and need fresh approval each time.
