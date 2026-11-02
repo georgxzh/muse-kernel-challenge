@@ -87,4 +87,22 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   shorter capacities, grouped preparation from draft 4. Retest custom full verify.
 - Offline SM90 compilation passes. Resource analysis finds high register use
   (up to 249 registers), so remote timing is essential; no promotion assumed.
-- Pending; 4/10 checks used, 6 remain including the 2 reserved. 1/5 scored runs used.
+- Result PASS 16/16, 1.13039337x, 95% CI [1.11343747, 1.14734927], score 3331.849 us. Do not promote universally: full verify still regresses. 4/10 checks used; 6 remain including 2 reserved.
+
+## Attempt 3 scored submission and Git integration
+
+- User explicitly approved one submit; job `526d2f2d75ef4631` pending.
+- Attempt commit `697eb8a`. Remote master diverged at `203f89f` (Create README.md).
+  The user explicitly authorized preserving and merging that remote README outside
+  the attention folder. The merge completed; no other project's source was edited.
+- Scored attempts used today: 2/5. No other submit authorized.
+
+## Attempt 5 decision and next direction
+
+- Keep FA3 for full verify (custom ~326/629 us versus FA3 ~200/386 us at B=16/32).
+- Small full decode improved to 21.73 us (FA3 ~27.7 us); this is useful in a hybrid.
+- Wider sliding tiles are not a universal improvement: largest sliding verify is
+  34.31 us versus attempt 3's 31.76 us. Grouped preparation reduces large-verify
+  overhead, but not enough to compensate.
+- Offline resource reports show 218-249 registers/thread for the attention body,
+  limiting occupancy. Next investigate launch warps/stages before another check.
