@@ -31,7 +31,8 @@ if hasattr(module, "_align_local_routes"):
     signature = {name: "*i32" for name in ["Ids", "Local", "Sorted", "Experts", "Total"]}
     for m in (1, 4, 8, 16, 32, 33, 128, 256, 257):
         n = m * 8
-        bm = 8 if m <= 32 else (int(sys.argv[2]) if len(sys.argv) > 2 else 16)
+        threshold = 8 if "small_bm" in source.read_text() else 32
+        bm = 8 if m <= threshold else (int(sys.argv[2]) if len(sys.argv) > 2 else 16)
         constants = dict(N=n, START=0, E=32, BM=bm,
                          NP=triton.next_power_of_2(n), NE=32,
                          NB=triton.next_power_of_2(triton.cdiv(n, bm)))

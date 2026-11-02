@@ -169,3 +169,32 @@ Work is confined to this problem on `master`. Other chats share the repository.
   retain attempt 6. Snapshot `attempts/attempt_07.py`.
 - Checks used after launch: 7; remaining: 3. At most one more check may be
   used today; two checks remain reserved. Scored submissions remaining: 3.
+
+## Attempt 8 - 16-row tiles for M=16 and M=32 decode
+
+- Based on attempt 6. Keep BM8 for M<=8, use BM16 for 9<=M<=32,
+  and retain adaptive BM16/BM32 for larger token batches.
+- Rationale: a local expert receiving 9-16 rows otherwise rereads weights
+  in two BM8 tiles despite the hardware's minimum 16-row MMA tile.
+- Python syntax and offline SM90 compilation passed for the actual small
+  batch row-block choices and all adaptive large-batch sizes.
+- Remote check: `95c5b10e2f414f91`: PASS, all 5 tests and 6 timed shapes.
+- Speedup **1.362464x**, CI [1.342027, 1.382900], score 9870.72 us.
+- M16 151.66 us vs 189.39 baseline (1.249x), below attempt 6's 1.281x;
+  M32 204.66 us vs 213.54 baseline (1.043x), similar to attempt 6.
+- No overall improvement over attempt 6. Retain attempt 6 as the final entry.
+- Checks used: 8; **2 checks reserved. No more checks today.**
+- Attempt 6 remains active. User explicitly approved one scored submission
+  of frozen `attempts/attempt_06.py`; job `aa4935c3095c450d` is pending.
+- Scored submissions used: 3; remaining: 2.
+
+## Final selection
+
+- Active `submission.py` exactly matches frozen `attempts/attempt_06.py`.
+- Best check: **1.366962x** SGLang, 95% CI [1.346457, 1.387466].
+- Eight remote check attempts all passed 5 correctness tests and 6 timed
+  shapes. Tested tile/routing variations also compiled offline for SM90.
+- Precision stays NVFP4 weights, BF16 intermediates, FP32 GEMM reduction.
+  Only weight packing runs in prepare; fresh routing and activations are
+  computed entirely within CUDA-graph-capturable timed calls.
+- Daily checks used: 8/10. The final 2 checks are reserved.
