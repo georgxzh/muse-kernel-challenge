@@ -113,5 +113,22 @@
 - Archived byte-identical source in attempt4.py; raw SHA256 matches the source
   hash recorded before check 4. OKC server content keys differ from raw-file
   SHA256 for all four attempts; they should not be compared directly.
-- First candidate recommended for submission. Awaiting explicit user approval;
-  no okc submit has been run.
+- User explicitly approved submission of attempt4.py.
+- Scored submission: 77805d4b2f504d81, PASS five tests/eight timed shapes.
+  Speedup 1.139429x (95% interval 1.122337-1.156520), no flags.
+  Score 339998.4 us. Exact approved SHA256 verified before submit.
+  One scored submission used; four remain today. No further submission approved.
+
+## Attempt 5 - expansion occupancy and medium-prefill threshold
+
+- Keep submitted attempt4.py immutable. Candidate is attempt5.py.
+- Expand NVFP4 using 2048 elements / eight warps (was four warps). Offline
+  SM90 compilation reports 32 registers, no spills, versus 56 registers at
+  four warps. Larger 4096/four and 8192/eight variants used 127-128 registers.
+- Use the correct compact PSUM grouped-expert path above 2048 tokens (was
+  4096), testing the 3012-token prefill load. The same compute and precision
+  are preserved; no new arithmetic kernels are introduced.
+- Reason for check: expansion costs ~1.44 ms on long prefills; medium prefills
+  spend ~2.2 ms in Marlin and may benefit from grouped BF16 GEMMs.
+- Source SHA256: d2d9ac293c8f1106eb3b3711e0042e066a46180ab0618d29bca896515f11ecad
+- Check: e10cdfade5d847af. Result pending; five checks used, five left, two reserved.
