@@ -77,11 +77,30 @@ correctness or performance result.
   T<=8. Do not promote this all-small-batch version.
 - Second check today; 8 remained at dispatch, 2 reserved.
 
-## Prepared candidate: smaller Marlin route tiles
+## Attempt 3: smaller Marlin route tiles
 
 - File: candidate_moe_tiles.py, based on attempt 1 independently of attempt 2.
 - Use route block M=8 up to 16 tokens, M=16 above that, reducing the baseline's
   M=48/64 padding and exposing more parallel work for large batches.
 - The first profile shows expert GEMMs take up to 75% of sliding verify time.
 - Same route alignment, expert weights, activations, FP32 reduction, and norms.
-- Local syntax validation passed. Not checked yet.
+- Local syntax validation passed.
+- Check 4a095a5b613f4139: PASS, 13/13 tests, no flags, every timed shape faster.
+- Speedup 1.0688928x; 95% CI [1.0528594, 1.0849262]; score 21162.3652 us.
+- Source SHA256: 350cc8bab0c9c6bf415c1e00daca3bcf71067776a5a9a14f39aadcf4429aec53.
+- Profile: profiles/candidate_moe_tiles.4a095a5b613f4139.txt.
+- Large verify shapes improve to 1.131-1.216x; other shapes retain QK-fusion gains.
+- Decision: promote the exact checked source to submission.py; recommend an
+  immediate scored submission with user approval.
+- Third check today; 7 remain, 2 reserved. Four scored submissions remain.
+
+## Prepared candidate: fuse pre-expert norm and local-route mapping
+
+- File: candidate_expert_prep.py, currently based on attempt 1 independently.
+- Fuse the 4096-channel RMSNorm with mapping global expert IDs to local 0-31
+  (or -1 for nonlocal), replacing separate subtraction, modulo, expert-map
+  lookup and normalization launches. Retain all routes and their weights.
+- Effective gain computed in BF16 in prepare, as SGLang does. RMS arithmetic
+  FP32; expert input BF16. Local syntax passed; not checked yet.
+- Source reviewed for norm precision:
+  https://github.com/sgl-project/sglang/blob/a55ab7d5ae1bba59ac351e55026fe7f7644ecc5f/python/sglang/srt/layers/muse_spark_layers.py
