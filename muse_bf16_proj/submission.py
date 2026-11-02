@@ -7,6 +7,9 @@ import triton
 import triton.language as tl
 
 
+_TILE = 64  # weight tile; every tiled layer's N and K are multiples
+
+
 class Weights(TypedDict):
     qkv_gate: torch.Tensor  # bfloat16 [2304, 8192]
     o: torch.Tensor         # bfloat16 [8192, 1024]
@@ -56,6 +59,28 @@ def _split_mm(X, W, L, P, M: tl.constexpr, N: tl.constexpr,
 
 
 @triton.jit
+def _tiled_mm(X, T, P, M: tl.constexpr, N: tl.constexpr, K: tl.constexpr,
+              SPLIT: tl.constexpr, BM: tl.constexpr, BN: tl.constexpr,
+              BK: tl.constexpr):
+    # T holds the same BF16 weights as contiguous BK x BN tiles, ordered by
+    # (output tile, K tile), so one CTA reads its weights sequentially.
+    mi = tl.program_id(0) * BM + tl.arange(0, BM)
+    tn = tl.program_id(1)
+    si = tl.program_id(2)
+    kj = tl.arange(0, BK)
+    nj = tl.arange(0, BN)
+    acc = tl.zeros((BM, BN), tl.float32)
+    for block in range(K // SPLIT // BK):
+        tk = si * (K // SPLIT // BK) + block
+        x = tl.load(X + mi[:, None] * K + tk * BK + kj[None, :],
+                    mi[:, None] < M, 0)
+        w = tl.load(T + (tn * (K // BK) + tk) * BK * BN + kj[:, None] * BN + nj[None, :])
+        acc = tl.dot(x, w, acc)
+    tl.store(P + si * M * N + mi[:, None] * N + tn * BN + nj[None, :], acc,
+             mi[:, None] < M)
+
+
+@triton.jit
 def _finish(P, Y, SIZE: tl.constexpr, SPLIT: tl.constexpr,
             BLOCK: tl.constexpr):
     i = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
@@ -83,6 +108,12 @@ def prepare(weights: Weights):
     hi = weights["router"].to(torch.bfloat16)
     state["router_hi"] = hi
     state["router_lo"] = (weights["router"] - hi.float()).to(torch.bfloat16)
+    for name in ("pooler", "unpooler"):
+        state[name + "_t"] = weights[name].T.contiguous()
+    for name in ("qkv_gate", "pooler", "unpooler"):
+        w = weights[name]
+        tiles = w.reshape(w.shape[0] // _TILE, _TILE, w.shape[1] // _TILE, _TILE)
+        state[name + "_tiled"] = tiles.permute(0, 2, 3, 1).contiguous()
     return state
 
 
@@ -90,10 +121,13 @@ def kernel_fn(data: Inputs, state) -> torch.Tensor:
     x, cfg = data["x"], data["config"]
     m, n, k, layer = cfg["m"], cfg["n"], cfg["k"], cfg["layer"]
     router = layer == "router"
-    if not router and (layer in ("qkv_gate", "o") or m > 16 or (layer == "unpooler" and m > 8)):
+    tiled = (layer in ("qkv_gate", "pooler") and m <= 16) or (layer == "unpooler" and m <= 8)
+    if layer in ("pooler", "unpooler") and m > 32:
+        return torch.mm(x, state[layer + "_t"][:, :n])
+    if not router and not tiled:
         return torch.mm(x, state[layer][:n].T)
-    split = (16 if m <= 32 else 8 if m <= 128 else 4) if router else (8 if k >= 4096 else 4)
-    bm = (16 if m <= 16 else 32 if m <= 32 else 64) if router else 16
+    split = (16 if m <= 32 else 8) if router else 8
+    bm = (16 if m <= 16 else 32 if m <= 32 else 64 if m <= 128 else 128) if router else 16
     bn = 32 if router else 64
     out = torch.empty((m, n), device=x.device,
                       dtype=torch.float32 if router else torch.bfloat16)
@@ -102,11 +136,15 @@ def kernel_fn(data: Inputs, state) -> torch.Tensor:
         _router_small[(m, triton.cdiv(n, 4), split)](
             x, state["router"], partial, m, n, k, split, 4, k // split,
             num_warps=4)
+    elif tiled:
+        _tiled_mm[(triton.cdiv(m, bm), n // _TILE, split)](
+            x, state[layer + "_tiled"], partial, m, n, k, split, bm, _TILE, _TILE,
+            num_warps=4, num_stages=3)
     else:
         w = state["router_hi"] if router else state[layer]
         lo = state["router_lo"] if router else w
         _split_mm[(triton.cdiv(m, bm), triton.cdiv(n, bn), split)](
             x, w, lo, partial, m, n, k, split, router, bm, bn, 64,
-            num_warps=4, num_stages=3)
+            num_warps=8 if bm == 128 else 4, num_stages=3)
     _finish[(triton.cdiv(m * n, 256),)](partial, out, m * n, split, 256)
     return out
