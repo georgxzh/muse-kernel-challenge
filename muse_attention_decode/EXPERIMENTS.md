@@ -294,3 +294,18 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   estimate is approximately 1.41x; await measured correctness and timing.
 - 7/10 current-cycle checks used. Three remain, of which two stay reserved.
   No scored submissions made or approved in this UTC cycle.
+
+## Attempt 15 — wider full-decode tiles (pending)
+
+- File: `candidates/attempt15_wide_decode.py`; check `b71d5bd0b39c4ffc`.
+- Change only full decode N=128 to N=256 relative to attempt 14. This halves
+  per-split loop iterations and may reduce gather/softmax overhead. Sliding
+  attention and verify retain N=128. No exact-context or tensor-value dispatch.
+- SM90 compilation PASS without attention spills. Full decode uses 196 registers
+  and 43 KB shared at two stages, versus 120 registers / 22 KB for N=128. This
+  reduces estimated residency from four to two CTAs/SM, but doubles keys/tile;
+  only GPU measurements can settle this tradeoff. One stage remained at 191
+  registers and offered no occupancy advantage, so retain two-stage pipelining.
+- Offline compile tool now respects the candidate's full-decode tile constant.
+- 8/10 current-cycle checks used. Both remaining checks are reserved: no further
+  check runs this cycle. No scored submission is authorized in this cycle.
