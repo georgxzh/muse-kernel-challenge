@@ -245,6 +245,15 @@
 - Verified better under the muse_bf16_proj rule: the changed group gains,
   worst shape -0.40% (limit -3%), and overall speedup 1.1462 > 1.1394.
   Recommend promoting to submission.py; scored run needs user approval.
+- User approved the scored run. TASK.md: "Your best run is your row on the
+  board", so a worse run could not displace attempt 4's 1.1394x.
+- submission.py = attempt9.py (raw SHA256 6cd90a1c..., same as recorded
+  before the check). Scored job 9cf1606be94840fd: PASS five tests/eight
+  timed shapes, no flags. Speedup 1.150580x (95% interval
+  1.133321-1.167839), score 336703.2 us. Server content_hash 9acff9d0...
+  equals check a537a0e611a844a7's, confirming identical code.
+- Per shape vs scored attempt 4: short +0.02/-0.27/+0.03/-0.01%; long
+  +1.27/+3.12/+4.41/+3.20%. Rank 684 -> 672. Scored runs used today: 1.
 
 ## Attempt 8 re-read under the verified-better rule
 

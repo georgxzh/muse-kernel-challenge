@@ -380,8 +380,8 @@ def _experts_grouped(x, topk_weights, topk_ids, state):
     _zero_group_padding[(LOCAL_EXPERTS, triton.cdiv(k, 128))](packed, psum, k, num_warps=4)
     bank = state["nvfp4"]
     w13 = torch.empty((LOCAL_EXPERTS, 2 * D_EXPERT, k), device=x.device, dtype=x.dtype)
-    _expand_nvfp4[(triton.cdiv(2 * D_EXPERT * k, 2048), LOCAL_EXPERTS)](
-        bank["w13"], bank["w13_sf"], bank["w13_gs"], w13, 2 * D_EXPERT * k, 2048,
+    _expand_pairs[(triton.cdiv(2 * D_EXPERT * k, 2048), LOCAL_EXPERTS)](
+        bank["w13"], bank["w13_sf"], bank["w13_gs"], w13.view(torch.int32), 2 * D_EXPERT * k, 1024,
         num_warps=4)
     hidden = torch.empty((m, 2 * D_EXPERT), device=x.device, dtype=x.dtype)
     state["grouped_gemm"](packed, w13, hidden, psum, use_psum_layout=True)
@@ -391,8 +391,8 @@ def _experts_grouped(x, topk_weights, topk_ids, state):
     del hidden
     _zero_group_padding[(LOCAL_EXPERTS, triton.cdiv(D_EXPERT, 128))](inter, psum, D_EXPERT, num_warps=4)
     w2 = torch.empty((LOCAL_EXPERTS, k, D_EXPERT), device=x.device, dtype=x.dtype)
-    _expand_nvfp4[(triton.cdiv(k * D_EXPERT, 2048), LOCAL_EXPERTS)](
-        bank["w2"], bank["w2_sf"], bank["w2_gs"], w2, k * D_EXPERT, 2048,
+    _expand_pairs[(triton.cdiv(k * D_EXPERT, 2048), LOCAL_EXPERTS)](
+        bank["w2"], bank["w2_sf"], bank["w2_gs"], w2.view(torch.int32), k * D_EXPERT, 1024,
         num_warps=4)
     y = torch.empty((m, k), device=x.device, dtype=x.dtype)
     state["grouped_gemm"](inter, w2, y, psum, use_psum_layout=True)
@@ -401,6 +401,47 @@ def _experts_grouped(x, topk_weights, topk_ids, state):
     _grouped_finalize[(t,)](y, topk_weights, local_ids, mapping, state["post_expert_w"], out,
                             k, num_warps=8)
     return out
+
+
+
+@triton.jit
+def _expand_pairs(W, SF, GS, OUT, NK: tl.constexpr, BLOCK: tl.constexpr):
+    e = tl.program_id(1)
+    j = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    raw = tl.load(W + e * (NK // 2) + j, j < NK // 2, other=0).to(tl.int32)
+    sf = tl.load(SF + e * (NK // 16) + j // 8, j < NK // 2, other=0.0).to(tl.float32)
+    scale = sf * tl.load(GS + e)
+    # PRMT decodes two exact E2M1 values to FP16 bit patterns. FP16 is only
+    # an exact encoding of the eight magnitudes here, not a rounded product.
+    # Convert to FP32, multiply by the same rounded SF*GS as the original
+    # expansion, and round both results to BF16 in one packed instruction.
+    pair = tl.inline_asm_elementwise(
+        asm=r"""{
+            .reg .b32 sel, tmp, vals;
+            .reg .b16 lo, hi;
+            .reg .f32 f0, f1;
+            and.b32 sel, $1, 7;
+            shl.b32 sel, sel, 4;
+            and.b32 tmp, $1, 0x70;
+            shl.b32 tmp, tmp, 8;
+            or.b32 sel, sel, tmp;
+            prmt.b32 vals, 0x3e3c3800, 0x46444240, sel;
+            and.b32 tmp, $1, 8;
+            shl.b32 tmp, tmp, 12;
+            or.b32 vals, vals, tmp;
+            and.b32 tmp, $1, 0x80;
+            shl.b32 tmp, tmp, 24;
+            or.b32 vals, vals, tmp;
+            mov.b32 {lo, hi}, vals;
+            cvt.f32.f16 f0, lo;
+            cvt.f32.f16 f1, hi;
+            mul.f32 f0, f0, $2;
+            mul.f32 f1, f1, $2;
+            cvt.rn.bf16x2.f32 $0, f1, f0;
+        }""",
+        constraints="=r,r,f", args=[raw, scale], dtype=tl.int32,
+        is_pure=True, pack=1)
+    tl.store(OUT + e * (NK // 2) + j, pair, j < NK // 2)
 
 
 @triton.jit
