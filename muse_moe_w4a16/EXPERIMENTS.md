@@ -211,3 +211,26 @@ Work is confined to this problem on `master`. Other chats share the repository.
 - Budget: 8/10 checks used, **2 reserved**; 3/5 scored submissions used,
   **2 remaining**. Every scored submission launched by this chat had explicit
   user approval; the separate attempt-3 submission is documented above.
+
+## Offline profile review (UTC 2026-11-03, no checks spent)
+
+- Board: scored 1.3617x (aa4935c3095c450d, attempt 6), rank 1029/1361,
+  leader 2.76x. The user dropped the 2-check reserve (boards close 07:59 UTC Nov 5).
+- Marlin is 87-96% of GPU time on every scored shape. Against the task's HBM
+  floor, attempt 6 reaches: M1 23%, M16 36%, M32 36%, M8 36%, M128 32%,
+  M256 27% of floor bandwidth. Alignment/SiLU/norm are only 3-10 us in total.
+- Marlin tuning is exhausted: row blocks 8/16/32/64 and adaptive grouping
+  (attempts 2-8) all land at 1.32-1.37x. use_atomic_add is not an option:
+  it reduces through BF16 atomics, coarser than the FP32 reduction we keep.
+- Only remaining large lever: replace Marlin with a skinny NVFP4 W4A16 MoE
+  kernel for small M. Sketch: reuse _align_local_routes BM16 blocks; one CTA
+  per (16-row expert block, N tile, K split); load native NVFP4 bytes and FP8
+  scales; exact PRMT E2M1 decode with the same FP32 SF*GS product and RN BF16
+  rounding as muse_prefill_layer attempt 9 (checked bit-exact path); tl.dot
+  BF16 with FP32 accumulation; FP32 split-K reduction; BF16 outputs as now.
+  Codex's prefill tiled prototype fits in 168-254 regs at BM=64 without
+  spills, so BM=16 should be well within budget.
+- Estimate: at ~55-60% of floor on M1/M8/M16/M32 the board would reach about
+  1.7-2.0x (geomean over the six loads); the same kernel would also replace
+  Marlin in muse_decode_layer (45-52% of its larger shapes). Cost: several
+  hours of build plus multiple blind checks (no local GPU).
