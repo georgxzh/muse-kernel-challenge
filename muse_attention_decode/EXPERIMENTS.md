@@ -251,3 +251,9 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   the current scored run's per-case baseline and recompute load weights. It
   reproduces 1.38346370x for the current run. With only existing attempt 8 gains,
   estimated combination is 1.41345x; this is not a measured result or a promotion.
+
+## Attempt 9 GPU result
+
+- Job `c9fb0a3f8f0847d5`: PASS 16/16, 1.28433151x, 95% CI [1.26506654, 1.31143679], score 2932.498 us.
+- L2-only KV loads did not improve the universal FP8-PV candidate; retain current hybrid.
+- submission.py remains byte-identical to scored attempt 7 (1.38346370x).
