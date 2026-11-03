@@ -285,3 +285,27 @@
 - Prepared while the paired-decoder GPU job waits. No additional check or
   scored submission requested for this combination.
 - Source SHA256: 945b89abd1a9c9fd3fd3509468e370c18b925d8641800a252ac3142b5b4a7ffa
+
+## Attempt 10 - attempt 9 + attempt 8's short-prefill alignment (no hint)
+
+- attempt10.py = attempt 9 plus attempt 8's _align_local_routes path for
+  <=1024-token prefills. Attempt 8's expected_m_for_psum_layout hint is
+  dropped (it showed no long-shape gain and a -3.86% outlier). Diff vs attempt
+  8: only the paired expansion and the removed hints.
+- Offline SM90 compile (Triton 3.5.1, read-only attention venv with -B): all
+  kernels PASS, saved as offline_v10.txt. Source SHA256:
+  c335e88db5c3095945a239542f6509d79c9313bc4d65d330556340ca72b85127
+- First check request hit a connection reset; job list confirmed no job was
+  created. Retry accepted as check 8197e711f8644fb0 (UTC 2026-11-03 check 3).
+- Result: PASS five tests/eight timed shapes, no flags. Speedup 1.159238x
+  (95% interval 1.141849-1.176626), score 334188.5 us. content_hash 3ef3cc49...
+- Changed shapes are only the two batch-1 q753 shapes (batch 4 = 3012 tokens,
+  above the 1024 cutoff). vs scored attempt 9: +2.27% sliding, +1.84% full
+  (group ~+2.05%; attempt 9 run-to-run on these is 0.13-0.26%). Matches
+  attempt 8's +2.68/+1.34%.
+- Unchanged shapes: -0.22% to +0.53%, except 16K ctx0 full -2.11% (-2.29% vs
+  attempt 9 mean). Its code is identical to attempt 9; that shape has the most
+  noise (1.6% between attempt 4 runs). Within the 3% limit.
+- Verified better under the rule: changed group gains above noise, worst shape
+  -2.11% > -3%, overall 1.1592 > 1.1506. Candidate for a scored run, pending
+  user approval. submission.py remains attempt 9.
