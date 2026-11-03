@@ -356,3 +356,35 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - submission.py is byte-identical to candidates/attempt14_pv_hybrid.py
   (SHA256 7f0dbde8...). Lowest check on this board is attempt 13 at 0.9858x
   (66d0fa57bd7f403b, never scored); every scored run has been >= 1.28x.
+
+## Attempt 16 - programmatic dependent launch (PDL) between the Triton kernels
+
+- Bookkeeping audit (UTC 2026-11-03): every small shape runs exactly three
+  kernels (_prepare -> _attention_parts -> _combine_gate) with no zero-fills,
+  copies or casts; timed minus profiled kernel time is 2.4-4.6 us on the small
+  sliding shapes (two kernel boundaries), i.e. launch overhead.
+- Judge image (llms.txt): PyTorch, Triton, FlashInfer, DeepGEMM, TileLang, CuTe
+  DSL, CUTLASS; nothing else, no network. Triton 3.5.1 supports launch_pdl and
+  triton.language.extra.cuda.gdc_wait / gdc_launch_dependents (griddepcontrol).
+- candidates/attempt16_pdl.py, based on scored attempt 14: _prepare calls
+  gdc_launch_dependents() at its start; _attention_parts is launched with
+  launch_pdl=True and calls gdc_wait() before any memory access (SASS: no load or
+  store before ACQBULK), triggering its dependents after its final stores;
+  _combine_gate (launch_pdl=True) loads its gate from the immutable qkv input,
+  then gdc_wait() before reading partials/LSE. No global write precedes a wait,
+  so CUDA-graph memory planning (stream order) stays valid. FA3 path unchanged.
+  Arithmetic unchanged.
+- Offline SM90 PASS, no spills; PTX griddepcontrol.wait/launch_dependents and
+  SASS ACQBULK/PREEXIT present (candidates/offline_attempt16_pdl.txt).
+- Source SHA256: 616c4bbbb33456d1ae36d4ecb5cc0d6db249dd370af25b9a9a99f69e2f209f38
+- Check 464ab004478145af (UTC 2026-11-03 check 9): PASS 16/16 tests, 12/12
+  shapes, no flags. 1.4462070x (CI 1.4245139-1.4679001), score 2604.261 us.
+- vs mean of attempt 14's two runs: 10 PDL-path shapes +3.47% as a group:
+  sliding decode-1 +17.54% (9.4 -> 7.8 us), full decode-1 +6.07%, sliding
+  verify-1 +9.20%, full verify-1 +4.64%, sliding verify-16 +4.75%, sliding
+  decode-32 +2.90%, sliding verify-32 +1.94%, full decode-16 -0.06%; sliding
+  decode-16 -3.87% (a14 run-to-run 0.8%), full decode-32 -6.45% (a14's own runs
+  differ 12.7% there). FA3 shapes +0.09/+0.03% (unchanged code).
+- Rule: group gains, overall higher (1.4462 > scored 1.4279), but two shapes past
+  -3% (one known-noisy). Next: attempt 17 moves _prepare's trigger to its end to
+  test whether early staging of attention CTAs costs sliding decode-16.
