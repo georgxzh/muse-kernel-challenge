@@ -343,3 +343,22 @@
 - Risk: the 524K-CTA expansion grid competes with GEMMs/FA3 for SMs and HBM;
   overlap may be partial. Upper bound ~1.06 ms per long prefill (5-9%).
 - Source SHA256: 8a78e8b91c07acb47b7747656ef041ab36129bc2281798b568b81e672f1a8dba
+- Budget rule update (user, UTC 2026-11-03): the 2-check reserve is dropped
+  because the kernel boards close 07:59 UTC Nov 5. Cap still 10 checks / 5 scored
+  per board per UTC day; ask before every scored run.
+- Check ae3bac8ecd4d4950 (UTC 2026-11-03 check 4): PASS five tests/eight timed
+  shapes, no flags. Speedup 1.159409x (95% interval 1.142018-1.176800), score
+  334139.1 us, content_hash bf9d488e...
+- Long (changed) shapes vs scored attempt 10: +0.78/+0.09/+1.51/+0.87%, group
+  +0.81%; vs mean of both attempt 10 runs group +0.34%. Attempt 10's own long-
+  shape run-to-run spread is 0.7-2.7%, so the gain is within noise. Short
+  shapes -0.11% to +0.39% (unchanged code).
+- Profile: "GPU busy" is only ~0.2-0.3 ms below the summed kernel time, which
+  is the same overlap attempt 10 already had. _expand_pairs got slower (1.06 ->
+  ~1.15 ms) and grouped GEMMs did not shrink. Interpretation: the expansion's
+  524K-CTA grid and the persistent cuBLAS/DeepGEMM/FA3 kernels cannot co-reside
+  on the SMs, so they largely run in turn instead of overlapping. Stream
+  priority would not fix co-residency.
+- NOT verified better (group gain inside noise). submission.py stays at attempt
+  10. Drop the stream-overlap direction; removing the expansion's HBM round trip
+  needs dequantization fused into the grouped GEMM instead.
