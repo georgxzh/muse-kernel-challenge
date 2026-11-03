@@ -154,3 +154,9 @@ Changed shapes count as one group. A candidate is verified better when the group
 - Algebra matches the baseline's two separate hi/lo products. Activations are neither duplicated nor rounded, original FP32 router remains available, and all activation-dependent work is timed.
 - Rationale: use optimized cuBLAS for larger router matrices and improve occupancy by doubling output width; avoid two GEMM launches and Triton's repeated tiled weight loads. All other shape paths are byte-for-byte unchanged from attempt 6.
 - Local Python syntax passes. First check requested after the UTC reset; source has no new GPU compilation complexity except a masked FP32 add kernel.
+
+### Archival completeness
+
+- Archived our original attempt 3 source and exhaustive bit-level packing validator after reconciling the intervening work; result remains compiler failure, not a correctness or speed result.
+- Archived our original attempt 4 source and measured text profile: PASS 1.1356860x, CI 1.1186507-1.1527213; layout gains were already selectively incorporated in the later committed attempts.
+- These archival commits do not modify verified `submission.py` or consume new checks.
