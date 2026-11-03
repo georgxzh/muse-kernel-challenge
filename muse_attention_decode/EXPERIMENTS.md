@@ -309,3 +309,15 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Offline compile tool now respects the candidate's full-decode tile constant.
 - 8/10 current-cycle checks used. Both remaining checks are reserved: no further
   check runs this cycle. No scored submission is authorized in this cycle.
+
+## Attempt 14 GPU result — new best checked
+
+- Job `300cb7ecb4304bfa`: PASS 16/16, 1.40088781x, 95% CI
+  [1.37987449, 1.43037438], score 2688.509 us, no flags.
+- Full decode B=1/16/32: 20.15/157.49/284.00 us; full verify B1: 27.35 us.
+  Sliding and FA3 paths remain close to current timings. Overall improvement
+  versus the scored 1.38346370x version is modest and confidence intervals overlap.
+- Promoted byte-identical candidate to submission.py as best checked. Existing
+  scored submission remains attempt 7 until a new exact submit is approved.
+- Attempt 15 still running; compare before asking for a scored submission.
+- 8/10 current-cycle checks used, two reserved. No scored runs used this cycle.

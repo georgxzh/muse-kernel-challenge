@@ -1,5 +1,5 @@
 # okc: problem=muse_attention_decode
-"""Paged FP8 attention with fused preparation/gate and FA3 for batched full verify."""
+"""Hybrid FP8/BF16 PV attention with FA3 for batched full verify."""
 
 import torch
 import triton as tr
@@ -101,12 +101,17 @@ def _attention_parts(Q, KC, VC, PT, LENS, KS, VS, PART, LSE,
         alpha = tl.exp2(m - new_m)
         z = z * alpha + tl.sum(p, 1)
         v = tl.load(VC + (rows[:, None] * HK + kh) * D + d[None, :],
-                    mask=ts[:, None] < seqlen, other=0.).to(tl.bfloat16)
+                    mask=ts[:, None] < seqlen, other=0.)
         acc = acc * alpha[:, None]
-        acc = tl.dot(p.to(tl.bfloat16), v, acc)
+        if WINDOW:
+            acc = tl.dot(p.to(tl.bfloat16), v.to(tl.bfloat16), acc)
+        else:
+            acc = tl.dot((p * 256.).to(q.dtype), v, acc)
         m = new_m
     base = ((b * HK + kh) * SPLITS + split) * (L * G) + r
     result = acc / tl.maximum(z[:, None], 1.e-20) * tl.load(VS)
+    if not WINDOW:
+        result = result / 256.
     tl.store(PART + base[:, None] * D + d[None, :], result, mask=r[:, None] < L * G)
     logsum = tl.where(z > 0, m + tl.log2(z), -float("inf"))
     tl.store(LSE + base, logsum, mask=r < L * G)
