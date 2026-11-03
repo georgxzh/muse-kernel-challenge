@@ -211,3 +211,23 @@ Changed shapes count as one group. A candidate is verified better when the group
 - Not verified better (overall 1.1617 < scored 1.1656; one unchanged shape past
   -3%). submission.py stays attempt 7. Follow-on attempt 12: same epilogue for
   tiled qkv_gate/pooler (m<=16) and unpooler (m<=8); router m=32 back to _finish.
+
+## Attempt 12 - single-kernel split-K for router m<=16 and tiled shapes
+
+- attempts/attempt12_serial_all.py = attempt 11 + the same in-kernel epilogue
+  for tiled qkv_gate/pooler (m<=16) and unpooler (m<=8); router m=32 back to
+  _finish. Offline compile PASS, no spills (attempts/offline_serial_12.txt).
+- Source SHA256: 8f5e49a6b9fb39d3b5e38564726edfcc7e9d60955cda504bd10f4850e4b12776
+- Check 171753ddbf07418b (UTC 2026-11-03 check 5): PASS 9/9 tests, 30/30
+  shapes, no flags. 1.1708546x (CI 1.1532918-1.1884174), score 4125.875 us.
+- vs mean of attempt 7's two runs, 13 changed shapes: group +3.27%. router m=1/
+  8/16 +5.3/+8.3/+5.5%; pooler m=1/8/16 +5.1/+5.1/+1.0%; unpooler m=1/8
+  +1.5/+2.6%; qkv_gate m=1/8/16 +3.1/+1.8/-2.9% (worst changed shape -2.87%).
+- 17 unchanged shapes: geo -0.38%; worst pooler m=256 -4.65% (cuBLAS path,
+  code identical to attempt 7; attempt 8 also ran -3.6% there on unchanged
+  code). Against the scored run alone, qkv_gate m=16 -4.53% and unchanged
+  qkv_gate m=32 -5.35% (attempt 7's own two runs differ by 5.7% at m=32).
+- Rule reading: changed group gains, overall higher (1.1709 > scored 1.1656),
+  every changed shape within -3% of the attempt 7 mean; one unchanged-code shape
+  past -3% (pooler m=256), the same situation the user waived for attempt 6.
+  Recommend a scored run, pending explicit user approval.
