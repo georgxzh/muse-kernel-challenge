@@ -447,3 +447,30 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Next hypothesis (attempts 21/22): the random page=1 gathers read 64-byte half
   rows per KV-head CTA (two random DRAM accesses per 128-byte row); read whole
   rows with both KV heads in one CTA.
+
+## Attempts 21-22 - full decode with both KV heads per CTA
+
+- New kernel _attention_pair for full-layer decode (L=1, HK=2, HQ=16): one CTA
+  per (sequence, split) covers all 16 query heads; each token's K and V rows
+  (128 FP8 bytes) are gathered whole instead of one 64-byte half per KV-head
+  CTA. Query row r holds zeros outside its KV head's 64 columns, so one FP8 QK
+  over 128 columns equals the per-head product; PV produces both heads'
+  columns and each row stores only its own. Same partial/LSE layout and
+  _combine_gate; same FP8 QK / scaled FP8 PV / FP32 softmax as attempt 17.
+  Everything else is attempt 17. Offline SM90 PASS, no spills, PDL order OK
+  (tools/compile_pair.py).
+- attempt21_pair_heads.py (128-token tiles, 201 regs, 40 KB smem: 2 CTAs/SM).
+  SHA256 4f04adfd47c50a68c1e994683d58f68192a73d4020fff6c60c32b387fd8bcb2b.
+  Check 84dcbe01b6254c7f: PASS 16/16, 1.4318052x, score 2630.456 us.
+  Full decode-1/16/32: 20.9 / 164.0 / 276.6 us vs 18.8 / 155.7 / 284.4 us.
+- attempt22_pair_heads_n64.py (64-token tiles, 146 regs, 22 KB: 3 CTAs/SM).
+  SHA256 892cfe05cb336663da1312cda4f9aa54c4f56c8a1151507ee11ca9538dad1292.
+  Check 1833a762b0e9414a: PASS 16/16, 1.4095663x, score 2671.957 us.
+  Full decode-1/16/32: 18.9 / 170.9 / 316.7 us.
+- Whole-row gathers do not help: the half-row reads are not the limiter. Both
+  rejected.
+- SASS count (attempt 17, full decode loop): 759 instructions per warp per
+  128-token tile (IMAD 155, LDS 105, F2FP 80, ISETP 70, FSEL+SEL 50, HMMA 32);
+  5.12M token-heads at decode-32 is ~116 us of pure issue at 4 IPC/SM. The
+  kernel is largely instruction-bound. Next: attempt 23 removes the masks from
+  interior tiles (572 instructions per tile).
