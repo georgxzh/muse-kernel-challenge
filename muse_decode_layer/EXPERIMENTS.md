@@ -231,7 +231,7 @@ correctness or performance result.
 - PASS, 13/13 tests, no flags. Scored speedup 1.1367534x;
   95% CI [1.1197021, 1.1538047].
 - Profile: profiles/submission.db5931ab057149c2.txt.
-- Current submitted best: attempt 6, source commit 5961b8d.
+- Submitted best before final entry: attempt 6, source commit 5961b8d.
 - Quota: 8 checks used, 2 reserved; 4 scored runs used, 1 left. No further
   check today before the UTC reset, honoring the user's reserve requirement.
 - Generated verbose JSON/log profiles stay on disk but are ignored; readable
@@ -248,9 +248,39 @@ correctness or performance result.
 | 5 | Uniform expert tiles M=8 | 1.0305x | 13/13 | Rejected regression |
 | 6 | Fused BF16 hi/lo router | 1.1310x | 13/13 | Scored 1.1368x |
 | 7 | Expert tiles M=32 above T=32 | 1.1116x | 13/13 | Use only above T=128 |
-| 8 | Router + measured expert tiles | 1.1514x | 13/13 | Best checked; await submit approval |
+| 8 | Router + measured expert tiles | 1.1514x | 13/13 | Scored 1.1437x; submitted best |
 
 - All work is inside muse_decode_layer on master. Every attempt is committed
   with its result and pushed; only explicit decoder paths are staged.
-- Never rerun okc check before UTC reset: 2 checks are reserved.
-- One scored submission remains today; every submit requires fresh user approval.
+- The previous UTC day ended with 8 checks used and 2 reserved, untouched.
+- Final scored submission was explicitly approved and accepted as
+  daa4848cafe04e93; PASS at 1.1436969x, the new submitted best.
+- No further check was dispatched; the two reserved checks were untouched.
+
+## Approved scored entry for attempt 8 (completed)
+
+- User explicitly approved one submit, then asked to continue.
+- Verified master and approved source SHA256 before dispatch:
+  25745660cab7273dd135e2ff0c9a1400697413f0451c4c9067e8e40dcbe79243.
+- Accepted job daa4848cafe04e93; source commit 581916f.
+- Result: PASS, 13/13 tests, no flags; every timed shape faster than SGLang.
+- Scored speedup 1.1436969x; 95% CI [1.1265415, 1.1608524];
+  score 19778.2292 us versus normalized baseline 22620.3 us.
+- Profile: profiles/submission.daa4848cafe04e93.txt.
+- Keep the exact approved source in submission.py; its SHA256 is unchanged.
+- New submitted best improves on the previous 1.1367534x scored entry.
+- No extra check or scored retry launched. Two check slots remain reserved.
+
+## Quota correction after the UTC reset
+
+- Final job was created 2026-11-03 01:39:13 UTC (still Nov 2 in Toronto), so
+  it counts in the new UTC day. Earlier pending text incorrectly assumed the
+  previous day's remaining scored slot; that text is corrected above.
+- Live limits after final scoring: platform 20 checks/day (0 used, 20 left),
+  10 scored/day (1 used, 9 left). The platform increased its limits.
+- Continue honoring the user's stricter limits: at most 10 checks and 5 scored
+  per UTC day, always retain 2 checks, and ask before every okc submit.
+- Therefore the new UTC day's user-capped budget is 10 checks (at most 8 may
+  be used while retaining the reserve) and 4 further scored entries with approval.
+- No new check or scored run was launched after this final approved submission.
+- Only muse_decode_layer files were edited/staged; master retained throughout.
