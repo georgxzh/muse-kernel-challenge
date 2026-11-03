@@ -1,0 +1,7 @@
+Triton 3.5.1 {'FUSED_BKP': 32, 'FUSED_BM': 128, 'FUSED_BN': 128, 'FUSED_GROUP_M': 8}
+gemm1 w13: warps=8 stages=3 shared=73728 ::     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 127 registers, used 1 barriers
+   top ops: IMAD=149, LOP3=133, F2FP=50, PRMT=48, STS=42, HADD2=34, FMUL=34, CS2R=33, LEA=31, ISETP=22, LDS=20, IADD3=19, UMOV=16, LDGSTS=15, NOP=15, LDG=12
+   HGMMA: 4  HMMA: 0  LDGSTS(cp.async): 15  LDG forms: {'LDG.E': 10, 'LDG.E.U8': 2}
+gemm2 w2: warps=8 stages=3 shared=73728 ::     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 127 registers, used 1 barriers
+   top ops: IMAD=149, LOP3=133, F2FP=50, PRMT=48, STS=42, HADD2=34, FMUL=34, CS2R=33, LEA=31, ISETP=22, LDS=20, IADD3=19, UMOV=16, LDGSTS=15, NOP=15, LDG=12
+   HGMMA: 4  HMMA: 0  LDGSTS(cp.async): 15  LDG forms: {'LDG.E': 10, 'LDG.E.U8': 2}

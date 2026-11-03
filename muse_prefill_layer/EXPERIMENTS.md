@@ -362,3 +362,34 @@
 - NOT verified better (group gain inside noise). submission.py stays at attempt
   10. Drop the stream-overlap direction; removing the expansion's HBM round trip
   needs dequantization fused into the grouped GEMM instead.
+
+## Attempt 12 - fused NVFP4 dequant + grouped GEMM (correct, 1.8x slower; line stopped)
+
+- User approved a timeboxed try (hard stop 00:00 UTC Nov 4), checks free,
+  ask before any scored run. Based on scored attempt 10.
+- prepare: lossless nibble repack (_repack_halves) so that, per K step of 64
+  elements, byte j holds element j (low nibble) and element 32+j (high
+  nibble); FP8 block scales and FP32 global scales unchanged. Pure-Python
+  emulation verified nibble, scale-group and K coverage for K=128/256/4096.
+- Long path: _fused_grouped_mm replaces both _expand_pairs + DeepGEMM calls.
+  128x128 tiles (aligned to the existing 128-row expert segments), 8 warps,
+  3 stages; exact PRMT decode (same FP32 SF*GS product and BF16 rounding as the
+  expansion) into two BF16 half-blocks that multiply contiguous activation
+  slices with wgmma; FP32 accumulation. Short paths unchanged.
+- Offline SM90 (tools/compile_fused.py, with the runtime's 16-byte pointer
+  alignment): 127 registers, 0 spills, 72 KB shared, HGMMA + cp.async
+  (fused_resources_v12.txt). Without alignment attrs the offline SASS showed
+  scalar loads, which was an artifact of the offline compile.
+- Check dca6950425574816 (UTC 2026-11-03 check 5): PASS 5/5 tests (4096-token
+  test exercises the fused path; errors match attempt 10) and 8/8 shapes, no
+  flags. Speedup 1.037912x (CI 1.022343-1.053480), score 373253.3 us.
+- 16K shapes 1.059-1.092x versus attempt 10's 1.30-1.55x. Profile: fused GEMMs
+  9.3-9.5 ms per 16K prefill versus 5.2 ms for expansion (1.06) + DeepGEMM
+  (2.7 + 1.4), i.e. ~215 effective TFLOP/s versus DeepGEMM's ~490.
+- Why it cannot win here: each weight is decoded once per 128-row tile (5-6x
+  per weight versus once in the expansion), and the decode runs in the same
+  warps as the wgmma loop. BM=256 would halve decode per FLOP but needs
+  256-aligned expert segments (~20% padding) and ~200+ registers; a cheaper
+  exact decode saves ~35% of decode instructions. Even together, that lands
+  at roughly parity before counting Triton's GEMM gap to DeepGEMM.
+- Decision: stop the fusion line. submission.py stays attempt 10 (scored 1.1571x).
