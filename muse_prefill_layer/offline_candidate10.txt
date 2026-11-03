@@ -1,0 +1,13 @@
+Triton 3.5.1
+_expand_nvfp4 {'NK': 33554432, 'BLOCK': 2048} PASS, shared bytes: 0
+_grouped_silu {'D': 4096} PASS, shared bytes: 0
+_grouped_finalize {'D': 4096} PASS, shared bytes: 32
+_qk_cache {'T': 4096, 'STRIDE': 2304, 'ROPE': False, 'SCALED': False} PASS, shared bytes: 128
+_qk_cache {'T': 4096, 'STRIDE': 2304, 'ROPE': False, 'SCALED': True} PASS, shared bytes: 128
+_qk_cache {'T': 4096, 'STRIDE': 2304, 'ROPE': True, 'SCALED': False} PASS, shared bytes: 2048
+_qk_cache {'T': 4096, 'STRIDE': 2304, 'ROPE': True, 'SCALED': True} PASS, shared bytes: 2048
+_route_hist {'SLOTS': 131072} PASS, shared bytes: 256
+_route_prefix {} PASS, shared bytes: 0
+_pack_routes {'K': 4096} PASS, shared bytes: 4
+_zero_group_padding {'K': 4096} PASS, shared bytes: 0
+_nvfp4_tiled_mm {'M': 135168, 'N': 8192, 'K': 4096, 'BM': 64, 'BN': 128, 'BK': 64, 'GROUP_M': 8} PASS, shared bytes: 24576

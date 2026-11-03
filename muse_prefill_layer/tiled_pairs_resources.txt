@@ -1,0 +1,170 @@
+Illegal shared layout; expected collapsed shapePerCTA to be at least [8, 64], collapsedTmaShape: [2, 2048]
+LLVM ERROR: Illegal shared layout
+module {
+  tt.func public @_nvfp4_tiled_mm(%arg0: !tt.ptr<bf16>, %arg1: !tt.ptr<i8>, %arg2: !tt.ptr<f8E4M3FN>, %arg3: !tt.ptr<f32>, %arg4: !tt.ptr<i32>, %arg5: !tt.ptr<bf16>) attributes {noinline = false} {
+    %c512_i32 = arith.constant 512 : i32
+    %cst = arith.constant dense<0.000000e+00> : tensor<64x128xf32>
+    %c2112_i32 = arith.constant 2112 : i32
+    %cst_0 = arith.constant dense<16> : tensor<128x32xi32>
+    %cst_1 = arith.constant dense<0.000000e+00> : tensor<128x32xf8E4M3FN>
+    %cst_2 = arith.constant dense<0> : tensor<128x32xi8>
+    %cst_3 = arith.constant dense<0.000000e+00> : tensor<64x64xbf16>
+    %c1_i32 = arith.constant 1 : i32
+    %cst_4 = arith.constant dense<8192> : tensor<64x1xi32>
+    %cst_5 = arith.constant dense<8> : tensor<1x32xi32>
+    %cst_6 = arith.constant dense<256> : tensor<128x1xi32>
+    %c2097152_i32 = arith.constant 2097152 : i32
+    %cst_7 = arith.constant dense<2048> : tensor<32xi32>
+    %cst_8 = arith.constant dense<8192> : tensor<128xi32>
+    %cst_9 = arith.constant dense<2048> : tensor<128x1xi32>
+    %c16777216_i32 = arith.constant 16777216 : i32
+    %c32_i32 = arith.constant 32 : i32
+    %cst_10 = arith.constant dense<4096> : tensor<64xi32>
+    %cst_11 = arith.constant dense<4096> : tensor<64x1xi32>
+    %cst_12 = arith.constant dense<-1> : tensor<64xi32>
+    %cst_13 = arith.constant dense<135168> : tensor<64xi32>
+    %c128_i32 = arith.constant 128 : i32
+    %c0_i32 = arith.constant 0 : i32
+    %c64_i32 = arith.constant 64 : i32
+    %c8_i32 = arith.constant 8 : i32
+    %0 = tt.get_program_id x : i32
+    %1 = arith.divsi %0, %c512_i32 : i32
+    %2 = arith.muli %1, %c8_i32 : i32
+    %3 = arith.subi %c2112_i32, %2 : i32
+    %4 = arith.minsi %3, %c8_i32 : i32
+    %5 = arith.remsi %0, %4 : i32
+    %6 = arith.addi %2, %5 : i32
+    %7 = arith.remsi %0, %c512_i32 : i32
+    %8 = arith.divsi %7, %4 : i32
+    %9 = arith.muli %6, %c64_i32 : i32
+    %10 = tt.addptr %arg4, %9 : !tt.ptr<i32>, i32
+    %11 = tt.load %10 : !tt.ptr<i32>
+    %12 = arith.cmpi sge, %11, %c0_i32 : i32
+    scf.if %12 {
+      %13 = tt.make_range {end = 64 : i32, start = 0 : i32} : tensor<64xi32>
+      %14 = tt.splat %9 : i32 -> tensor<64xi32>
+      %15 = arith.addi %14, %13 : tensor<64xi32>
+      %16 = arith.muli %8, %c128_i32 : i32
+      %17 = tt.make_range {end = 128 : i32, start = 0 : i32} : tensor<128xi32>
+      %18 = tt.splat %16 : i32 -> tensor<128xi32>
+      %19 = arith.addi %18, %17 : tensor<128xi32>
+      %20 = tt.make_range {end = 32 : i32, start = 0 : i32} : tensor<32xi32>
+      %21 = tt.splat %arg4 : !tt.ptr<i32> -> tensor<64x!tt.ptr<i32>>
+      %22 = tt.addptr %21, %15 : tensor<64x!tt.ptr<i32>>, tensor<64xi32>
+      %23 = arith.cmpi slt, %15, %cst_13 : tensor<64xi32>
+      %24 = tt.load %22, %23, %cst_12 : tensor<64x!tt.ptr<i32>>
+      %25 = tt.splat %11 : i32 -> tensor<64xi32>
+      %26 = arith.cmpi eq, %24, %25 : tensor<64xi32>
+      %27 = tt.addptr %arg3, %11 : !tt.ptr<f32>, i32
+      %28 = tt.load %27 : !tt.ptr<f32>
+      %29 = scf.for %arg6 = %c0_i32 to %c64_i32 step %c1_i32 iter_args(%arg7 = %cst) -> (tensor<64x128xf32>)  : i32 {
+        %45 = arith.muli %arg6, %c64_i32 : i32
+        %46 = tt.splat %45 : i32 -> tensor<64xi32>
+        %47 = arith.addi %46, %13 : tensor<64xi32>
+        %48 = tt.expand_dims %15 {axis = 1 : i32} : tensor<64xi32> -> tensor<64x1xi32>
+        %49 = arith.muli %48, %cst_11 : tensor<64x1xi32>
+        %50 = tt.splat %arg0 : !tt.ptr<bf16> -> tensor<64x1x!tt.ptr<bf16>>
+        %51 = tt.addptr %50, %49 : tensor<64x1x!tt.ptr<bf16>>, tensor<64x1xi32>
+        %52 = tt.expand_dims %47 {axis = 0 : i32} : tensor<64xi32> -> tensor<1x64xi32>
+        %53 = tt.broadcast %51 : tensor<64x1x!tt.ptr<bf16>> -> tensor<64x64x!tt.ptr<bf16>>
+        %54 = tt.broadcast %52 : tensor<1x64xi32> -> tensor<64x64xi32>
+        %55 = tt.addptr %53, %54 : tensor<64x64x!tt.ptr<bf16>>, tensor<64x64xi32>
+        %56 = tt.expand_dims %26 {axis = 1 : i32} : tensor<64xi1> -> tensor<64x1xi1>
+        %57 = arith.cmpi slt, %47, %cst_10 : tensor<64xi32>
+        %58 = tt.expand_dims %57 {axis = 0 : i32} : tensor<64xi1> -> tensor<1x64xi1>
+        %59 = tt.broadcast %56 : tensor<64x1xi1> -> tensor<64x64xi1>
+        %60 = tt.broadcast %58 : tensor<1x64xi1> -> tensor<64x64xi1>
+        %61 = arith.andi %59, %60 : tensor<64x64xi1>
+        %62 = tt.load %55, %61, %cst_3 : tensor<64x64x!tt.ptr<bf16>>
+        %63 = arith.muli %arg6, %c32_i32 : i32
+        %64 = tt.splat %63 : i32 -> tensor<32xi32>
+        %65 = arith.addi %64, %20 : tensor<32xi32>
+        %66 = arith.muli %11, %c16777216_i32 : i32
+        %67 = tt.addptr %arg1, %66 : !tt.ptr<i8>, i32
+        %68 = tt.expand_dims %19 {axis = 1 : i32} : tensor<128xi32> -> tensor<128x1xi32>
+        %69 = arith.muli %68, %cst_9 : tensor<128x1xi32>
+        %70 = tt.splat %67 : !tt.ptr<i8> -> tensor<128x1x!tt.ptr<i8>>
+        %71 = tt.addptr %70, %69 : tensor<128x1x!tt.ptr<i8>>, tensor<128x1xi32>
+        %72 = tt.expand_dims %65 {axis = 0 : i32} : tensor<32xi32> -> tensor<1x32xi32>
+        %73 = tt.broadcast %71 : tensor<128x1x!tt.ptr<i8>> -> tensor<128x32x!tt.ptr<i8>>
+        %74 = tt.broadcast %72 : tensor<1x32xi32> -> tensor<128x32xi32>
+        %75 = tt.addptr %73, %74 : tensor<128x32x!tt.ptr<i8>>, tensor<128x32xi32>
+        %76 = arith.cmpi slt, %19, %cst_8 : tensor<128xi32>
+        %77 = tt.expand_dims %76 {axis = 1 : i32} : tensor<128xi1> -> tensor<128x1xi1>
+        %78 = arith.cmpi slt, %65, %cst_7 : tensor<32xi32>
+        %79 = tt.expand_dims %78 {axis = 0 : i32} : tensor<32xi1> -> tensor<1x32xi1>
+        %80 = tt.broadcast %77 : tensor<128x1xi1> -> tensor<128x32xi1>
+        %81 = tt.broadcast %79 : tensor<1x32xi1> -> tensor<128x32xi1>
+        %82 = arith.andi %80, %81 : tensor<128x32xi1>
+        %83 = tt.load %75, %82, %cst_2 : tensor<128x32x!tt.ptr<i8>>
+        %84 = arith.extui %83 : tensor<128x32xi8> to tensor<128x32xi32>
+        %85 = arith.muli %11, %c2097152_i32 : i32
+        %86 = tt.addptr %arg2, %85 : !tt.ptr<f8E4M3FN>, i32
+        %87 = arith.muli %68, %cst_6 : tensor<128x1xi32>
+        %88 = tt.splat %86 : !tt.ptr<f8E4M3FN> -> tensor<128x1x!tt.ptr<f8E4M3FN>>
+        %89 = tt.addptr %88, %87 : tensor<128x1x!tt.ptr<f8E4M3FN>>, tensor<128x1xi32>
+        %90 = arith.divsi %72, %cst_5 : tensor<1x32xi32>
+        %91 = tt.broadcast %89 : tensor<128x1x!tt.ptr<f8E4M3FN>> -> tensor<128x32x!tt.ptr<f8E4M3FN>>
+        %92 = tt.broadcast %90 : tensor<1x32xi32> -> tensor<128x32xi32>
+        %93 = tt.addptr %91, %92 : tensor<128x32x!tt.ptr<f8E4M3FN>>, tensor<128x32xi32>
+        %94 = tt.load %93, %82, %cst_1 : tensor<128x32x!tt.ptr<f8E4M3FN>>
+        %95 = tt.fp_to_fp %94 : tensor<128x32xf8E4M3FN> -> tensor<128x32xf32>
+        %96 = tt.splat %28 : f32 -> tensor<128x32xf32>
+        %97 = arith.mulf %95, %96 : tensor<128x32xf32>
+        %98 = tt.elementwise_inline_asm "{\0A            .reg .b32 sel, tmp, vals;\0A            .reg .b16 lo, hi;\0A            .reg .f32 f0, f1;\0A            and.b32 sel, $1, 7;\0A            shl.b32 sel, sel, 4;\0A            and.b32 tmp, $1, 0x70;\0A            shl.b32 tmp, tmp, 8;\0A            or.b32 sel, sel, tmp;\0A            prmt.b32 vals, 0x3e3c3800, 0x46444240, sel;\0A            and.b32 tmp, $1, 8;\0A            shl.b32 tmp, tmp, 12;\0A            or.b32 vals, vals, tmp;\0A            and.b32 tmp, $1, 0x80;\0A            shl.b32 tmp, tmp, 24;\0A            or.b32 vals, vals, tmp;\0A            mov.b32 {lo, hi}, vals;\0A            cvt.f32.f16 f0, lo;\0A            cvt.f32.f16 f1, hi;\0A            mul.f32 f0, f0, $2;\0A            mul.f32 f1, f1, $2;\0A            cvt.rn.bf16x2.f32 $0, f1, f0;\0A        }" {constraints = "=r,r,f", packed_element = 1 : i32, pure = true} %84, %97 : tensor<128x32xi32>, tensor<128x32xf32> -> tensor<128x32xi32>
+        %99 = arith.trunci %98 : tensor<128x32xi32> to tensor<128x32xi16>
+        %100 = tt.bitcast %99 : tensor<128x32xi16> -> tensor<128x32xbf16>
+        %101 = arith.shrui %98, %cst_0 : tensor<128x32xi32>
+        %102 = arith.trunci %101 : tensor<128x32xi32> to tensor<128x32xi16>
+        %103 = tt.bitcast %102 : tensor<128x32xi16> -> tensor<128x32xbf16>
+        %104 = tt.join %100, %103 : tensor<128x32xbf16> -> tensor<128x32x2xbf16>
+        %105 = tt.reshape %104 : tensor<128x32x2xbf16> -> tensor<128x64xbf16>
+        %106 = tt.trans %105 {order = array<i32: 1, 0>} : tensor<128x64xbf16> -> tensor<64x128xbf16>
+        %107 = tt.dot %62, %106, %arg7, inputPrecision = tf32 : tensor<64x64xbf16> * tensor<64x128xbf16> -> tensor<64x128xf32>
+        scf.yield %107 : tensor<64x128xf32>
+      }
+      %30 = tt.expand_dims %15 {axis = 1 : i32} : tensor<64xi32> -> tensor<64x1xi32>
+      %31 = arith.muli %30, %cst_4 : tensor<64x1xi32>
+      %32 = tt.splat %arg5 : !tt.ptr<bf16> -> tensor<64x1x!tt.ptr<bf16>>
+      %33 = tt.addptr %32, %31 : tensor<64x1x!tt.ptr<bf16>>, tensor<64x1xi32>
+      %34 = tt.expand_dims %19 {axis = 0 : i32} : tensor<128xi32> -> tensor<1x128xi32>
+      %35 = tt.broadcast %33 : tensor<64x1x!tt.ptr<bf16>> -> tensor<64x128x!tt.ptr<bf16>>
+      %36 = tt.broadcast %34 : tensor<1x128xi32> -> tensor<64x128xi32>
+      %37 = tt.addptr %35, %36 : tensor<64x128x!tt.ptr<bf16>>, tensor<64x128xi32>
+      %38 = arith.truncf %29 : tensor<64x128xf32> to tensor<64x128xbf16>
+      %39 = tt.expand_dims %26 {axis = 1 : i32} : tensor<64xi1> -> tensor<64x1xi1>
+      %40 = arith.cmpi slt, %19, %cst_8 : tensor<128xi32>
+      %41 = tt.expand_dims %40 {axis = 0 : i32} : tensor<128xi1> -> tensor<1x128xi1>
+      %42 = tt.broadcast %39 : tensor<64x1xi1> -> tensor<64x128xi1>
+      %43 = tt.broadcast %41 : tensor<1x128xi1> -> tensor<64x128xi1>
+      %44 = arith.andi %42, %43 : tensor<64x128xi1>
+      tt.store %37, %38, %44 : tensor<64x128x!tt.ptr<bf16>>
+    }
+    tt.return
+  }
+}
+
+{-#
+  external_resources: {
+    mlir_reproducer: {
+      pipeline: "builtin.module(convert-triton-to-tritongpu{enable-source-remat=false num-ctas=1 num-warps=4 target=cuda:90 threads-per-warp=32}, tritongpu-coalesce, tritongpu-F32DotTC, triton-nvidia-gpu-plan-cta, tritongpu-remove-layout-conversions, tritongpu-optimize-thread-locality, tritongpu-accelerate-matmul, tritongpu-remove-layout-conversions, tritongpu-optimize-dot-operands{hoist-layout-conversion=true}, triton-nvidia-optimize-descriptor-encoding, triton-loop-aware-cse, tritongpu-fuse-nested-loops, canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true}, triton-licm, canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true}, tritongpu-combine-tensor-select-and-if, nvgpu-warp-specialization{dump-intermediate-steps=false num-stages=1}, tritongpu-assign-latencies{num-stages=1}, tritongpu-schedule-loops, tritongpu-pipeline{dump-intermediate-steps=false num-stages=1}, canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true}, triton-loop-aware-cse, tritongpu-prefetch, tritongpu-optimize-dot-operands{hoist-layout-conversion=true}, tritongpu-coalesce-async-copy, triton-nvidia-optimize-tmem-layouts, tritongpu-remove-layout-conversions, triton-nvidia-interleave-tmem, tritongpu-reduce-data-duplication, tritongpu-reorder-instructions, triton-loop-aware-cse, symbol-dce, triton-nvidia-tma-lowering, triton-nvidia-gpu-fence-insertion{compute-capability=90}, triton-nvidia-mma-lowering, sccp, cse, canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true})",
+      disable_threading: false,
+      verify_each: true
+    }
+  }
+#-}
+/home/georg/muse-kernel-challenge/muse_prefill_layer/.tools/offline_kernels.py:87:0: error: Failures have been detected while processing an MLIR pass pipeline
+/home/georg/muse-kernel-challenge/muse_prefill_layer/.tools/offline_kernels.py:87:0: note: Pipeline failed while executing [`TritonGPUOptimizeDotOperands` on 'builtin.module' operation]: reproducer generated at `std::errs, please share the reproducer above with Triton project.`
+Traceback (most recent call last):
+  File "/home/georg/muse-kernel-challenge/muse_prefill_layer/tools/profile_tiled.py", line 16, in <module>
+    k=triton.compile(ASTSource(_nvfp4_tiled_mm,
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/georg/muse-kernel-challenge/muse_attention_decode/.tools/venv/lib/python3.11/site-packages/triton/compiler/compiler.py", line 320, in compile
+    next_module = compile_ir(module, metadata)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/georg/muse-kernel-challenge/muse_attention_decode/.tools/venv/lib/python3.11/site-packages/triton/backends/nvidia/compiler.py", line 515, in <lambda>
+    stages["ttgir"] = lambda src, metadata: self.make_ttgir(src, metadata, options, capability)
+                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/georg/muse-kernel-challenge/muse_attention_decode/.tools/venv/lib/python3.11/site-packages/triton/backends/nvidia/compiler.py", line 319, in make_ttgir
+    pm.run(mod)
+RuntimeError: PassManager::run failed

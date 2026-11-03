@@ -1,0 +1,40 @@
+{'M': 135168, 'N': 8192, 'K': 4096, 'BM': 64, 'BN': 128, 'BK': 64, 'GROUP_M': 8} warps 8 stages 2 shared 24576 wgmma 4 mma.sync 0
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_nvfp4_tiled_mm' for 'sm_90a'
+ptxas info    : Function properties for _nvfp4_tiled_mm
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 255 registers, used 1 barriers
+ptxas info    : Compile time = 85.889 ms
+
+{'M': 135168, 'N': 8192, 'K': 4096, 'BM': 64, 'BN': 64, 'BK': 64, 'GROUP_M': 8} warps 8 stages 2 shared 16384 wgmma 4 mma.sync 0
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_nvfp4_tiled_mm' for 'sm_90a'
+ptxas info    : Function properties for _nvfp4_tiled_mm
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 169 registers, used 1 barriers
+ptxas info    : Compile time = 44.129 ms
+
+{'M': 135168, 'N': 8192, 'K': 4096, 'BM': 64, 'BN': 128, 'BK': 32, 'GROUP_M': 8} warps 8 stages 2 shared 16384 wgmma 2 mma.sync 0
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_nvfp4_tiled_mm' for 'sm_90a'
+ptxas info    : Function properties for _nvfp4_tiled_mm
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 224 registers, used 1 barriers
+ptxas info    : Compile time = 47.804 ms
+
+{'M': 135168, 'N': 8192, 'K': 4096, 'BM': 64, 'BN': 64, 'BK': 32, 'GROUP_M': 8} warps 8 stages 2 shared 8192 wgmma 2 mma.sync 0
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_nvfp4_tiled_mm' for 'sm_90a'
+ptxas info    : Function properties for _nvfp4_tiled_mm
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 128 registers, used 1 barriers
+ptxas info    : Compile time = 29.122 ms
+
+{'M': 135168, 'N': 8192, 'K': 4096, 'BM': 128, 'BN': 128, 'BK': 64, 'GROUP_M': 8} warps 8 stages 2 shared 32768 wgmma 4 mma.sync 0
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_nvfp4_tiled_mm' for 'sm_90a'
+ptxas info    : Function properties for _nvfp4_tiled_mm
+    568 bytes stack frame, 564 bytes spill stores, 564 bytes spill loads
+ptxas info    : Used 255 registers, used 1 barriers, 568 bytes cumulative stack size
+ptxas info    : Compile time = 158.406 ms
+
