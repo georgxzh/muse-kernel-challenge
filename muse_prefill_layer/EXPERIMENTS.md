@@ -180,3 +180,55 @@
   attempt 4. Short shapes are 0.969x/0.972x baseline. Four expert GEMMs
   total ~731 us vs ~700 us with baseline row tiles; not promoted/submitted.
 - Seven checks used, three left, two reserved. At most one more check today.
+
+## Attempt 8 - preserve row reuse; tune grouped-GEMM expected size
+
+- Independent candidate based on submitted attempt 4. Short prefills keep
+  baseline 64-row Marlin tiles and one pair of GEMMs. Only local alignment
+  changes: copied the checked _align_local_routes helper from the committed
+  expert problem into this folder and exclude nonlocal schedule blocks.
+- Long prefills retain every original compacted route and BF16 computation;
+  give DeepGEMM expected_m_for_psum_layout=max(128, tokens//16), a shape-only
+  performance hint (2x uniform EP route count per expert). This does not cap
+  routing or work: the exact GPU PSUM ends still determine all live rows.
+- Rationale: attempt 7 showed that smaller tiles/additional GEMMs regress,
+  while allocation capacity greatly overstates typical grouped expert size.
+- Python syntax and offline SM90 compile passed for all short-prefill shapes.
+- Source SHA256: 6fd9822278c7708731fb55856b0e1440351582e94409820fb00286f2b4365802
+- Initial requests on UTC 2026-11-02 failed transport; job history confirmed
+  no check was created. Accepted after the UTC reset as a58b6669fe854141.
+- PASS five tests/eight timed shapes, no flags. Speedup 1.149098x
+  (95% interval 1.131862-1.166335), score 337137.3 us.
+  Modest ~0.85% gain over submitted attempt 4 is inside timing uncertainty.
+  Retain the submitted default pending stronger evidence.
+- This is check 1 of the new UTC day, not check 8 of the old day.
+
+## Daily budget ledger
+
+- UTC 2026-11-02: seven accepted checks and one approved scored submission.
+  The attempt-8 transport failures consumed no quota.
+- UTC 2026-11-03: attempt 8 is accepted check 1; zero scored submissions.
+- Service now allows 20 checks / 10 submissions, but user limits remain
+  TEN checks / FIVE submissions, with two user-budget checks reserved.
+  Therefore at most eight accepted checks per UTC day may be run by this chat.
+
+## Attempt 9 - exact paired NVFP4 expansion
+
+- Independent candidate based on submitted attempt 4, not unverified attempt 8.
+- Decode each packed byte into two exact E2M1 values with a PRMT lookup into
+  FP16 encodings; convert these exact constants to FP32. No FP16 arithmetic
+  is performed. Share the rounded FP32 SF*GS product, then multiply FP32 and
+  use cvt.rn.bf16x2.f32 for one packed store. This preserves the submitted
+  decoder's FP32 multiplication order and BF16 rounding.
+- NVFP4 weights and FP8 scales remain unchanged in prepare. Expansion still
+  runs entirely inside the timed call; no expanded weights persist in state.
+- CPU emulation verified all 256 packed-byte decodings. NVIDIA PTX docs
+  confirm the first input is packed high and second low for bf16x2 conversion.
+- Offline SM90 compile passed. ptxas: 32 registers, zero spills versus 56
+  registers for the submitted single-value decoder at equal output count/CTA.
+- Source SHA256: 6cd90a1c7601a32134694da494de3e27a87fd5859f337dfc1f622bc9090147cc
+- Reason for check: reduce repeated scale conversion, decode/register cost,
+  and store instructions in the ~1.44 ms expansion stage.
+- Check a537a0e611a844a7 accepted after one transport-reset retry.
+- Result pending; this is UTC 2026-11-03 check 2. User limits still 10/5,
+  with two checks reserved (at most eight accepted checks per UTC day).

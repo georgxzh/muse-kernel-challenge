@@ -1,0 +1,16 @@
+Triton 3.5.1
+_expand_nvfp4 {'NK': 33554432, 'BLOCK': 2048} PASS, shared bytes: 0
+_grouped_silu {'D': 4096} PASS, shared bytes: 0
+_grouped_finalize {'D': 4096} PASS, shared bytes: 32
+_qk_cache {'T': 4096, 'STRIDE': 2304, 'ROPE': False, 'SCALED': False} PASS, shared bytes: 128
+_qk_cache {'T': 4096, 'STRIDE': 2304, 'ROPE': False, 'SCALED': True} PASS, shared bytes: 128
+_qk_cache {'T': 4096, 'STRIDE': 2304, 'ROPE': True, 'SCALED': False} PASS, shared bytes: 2048
+_qk_cache {'T': 4096, 'STRIDE': 2304, 'ROPE': True, 'SCALED': True} PASS, shared bytes: 2048
+_route_hist {'SLOTS': 131072} PASS, shared bytes: 256
+_route_prefix {} PASS, shared bytes: 0
+_pack_routes {'K': 4096} PASS, shared bytes: 4
+_zero_group_padding {'K': 4096} PASS, shared bytes: 0
+_align_local_routes {'N': 2400, 'START': 0, 'E': 32, 'BM': 64, 'NP': 4096, 'NE': 32, 'NB': 64} PASS, shared bytes: 512
+_align_local_routes {'N': 4800, 'START': 0, 'E': 32, 'BM': 64, 'NP': 8192, 'NE': 32, 'NB': 128} PASS, shared bytes: 1024
+_align_local_routes {'N': 6024, 'START': 0, 'E': 32, 'BM': 64, 'NP': 8192, 'NE': 32, 'NB': 128} PASS, shared bytes: 1024
+_align_local_routes {'N': 8192, 'START': 0, 'E': 32, 'BM': 64, 'NP': 8192, 'NE': 32, 'NB': 128} PASS, shared bytes: 1024
