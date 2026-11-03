@@ -313,3 +313,30 @@ correctness or performance result.
 - Profile Marlin time: verify 32 446-449 -> 395-410 us, but single-shot
   profiles also show increases elsewhere; timed medians do not confirm a gain.
 - NOT verified better (group gain inside noise). submission.py stays attempt 8.
+
+## Attempt 10: bf16_proj attempt-12 kernels for T<=8 projections and T<=16 router
+
+- File candidate_bf16_kernels.py, based on scored attempt 8 (submission.py).
+  The decode layer's projections are exactly bf16_proj's layers (qkv_gate
+  [2304,8192], o [8192,1024], pooler [4096,8192], unpooler [8192,4096] sliced
+  to 1024 rows at T<=8, router [256,8192] FP32).
+- Ported verbatim (AST-checked) from muse_bf16_proj attempt 12 (scored
+  f7b3322f650247af): _serial_reduce, _split_mm, _tiled_mm, _router_small.
+  T<=8: qkv_gate/pooler/unpooler use contiguous 64x64 weight tiles (exact copies
+  made in prepare) with single-kernel split-K; o uses cuBLAS (bf16_proj's
+  measured choice). Router T=1: FP32 GEMV (_router_small, FP32 input);
+  T=2..16: BF16 hi/lo split, FP32 accumulation, single kernel. Separate counter
+  buffers for the main stream and the router's side stream.
+- Offline SM90: 18 kernel variants, no spills (offline_bf16_kernels.txt).
+- Source SHA256: 893cb9bae65cc0148b8edd2c804053e6a9306c9c4fbad4ef1a8f0338589b03f9
+- Check 90c232a634c54bea (UTC 2026-11-03 check 2): PASS 13/13 tests, 12
+  shapes, no flags. 1.1422922x (CI 1.1251579-1.1594266), score 19802.551 us.
+- vs mean of attempt 8's two runs: changed T<=16 shapes +1.35% (decode-1
+  +1.64/+2.23%, verify-1 +1.34/+1.62%, decode-16 +0.76/+0.48%). Unchanged
+  verify-16/32 shapes -1.7 to -4.2% on identical code (slower machine/run).
+- Profile decode-1: _tiled_mm (3 calls) 39.8 us + cuBLAS o 7.1 us = 46.9 us
+  versus 50.3 us before (_dense_partials x4 + _dense_reduce x4): only ~3.4 us
+  saved. In-layer the tiled kernels run slower than standalone in bf16_proj
+  (33.2 us), and cuBLAS o is 7.1 us here versus 4.7 us standalone.
+- Not verified better (overall below scored 1.1437; unchanged shapes past -3%).
+  Next: attempt 11 restores the old split-K o path (_gemm) at T<=8.
