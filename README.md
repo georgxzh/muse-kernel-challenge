@@ -23,18 +23,6 @@ Each folder contains:
 - `EXPERIMENTS.md`: a log of each attempt, what changed, and the result
 - `profiles/`: per-run profiles returned by `okc`
 
-## Results so far
-
-| Problem | Best result | Notes |
-|---|---|---|
-| `muse_moe_w4a16` | **1.336×** | Local-expert alignment, fused post-norm |
-| `muse_bf16_proj` | **1.127×** (check 1.151×, unconfirmed) | Split-K Triton for small m, cuBLAS for large m, faster router |
-| `muse_attention_decode` | **1.111×** | One Triton launch fuses QK-norm, RoPE, FP8 quantization and the cache write; FA3 does the attention |
-| `muse_decode_layer` | **1.069×** | QK/cache fusion, split-K, smaller expert tiles |
-| `muse_prefill_layer` | 0.994× | Work in progress |
-
-Speedup is the geometric mean over loads of SGLang's time divided by mine. Each run reports a 95% interval of at least ±1.5%.
-
 ## Rules that shape the code
 
 - **CUDA graphs:** `kernel_fn` must be capturable. That means no `.item()`, `.cpu()` or syncs, and no allocation or branching that depends on input values. Branching on shapes and config is fine.
