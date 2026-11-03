@@ -257,3 +257,9 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Job `c9fb0a3f8f0847d5`: PASS 16/16, 1.28433151x, 95% CI [1.26506654, 1.31143679], score 2932.498 us.
 - L2-only KV loads did not improve the universal FP8-PV candidate; retain current hybrid.
 - submission.py remains byte-identical to scored attempt 7 (1.38346370x).
+
+## Attempt 10 GPU result
+
+- Job `53ead2c9320442a8`: PASS 16/16, 1.15726522x, 95% CI [1.13990625, 1.17462420], score 3254.483 us.
+- Occupancy-sized dynamic splitting was slower, especially full decode (213/422 us at B16/32). Fixed 2048-token splits remain preferable.
+- submission.py remains byte-identical to scored attempt 7 (1.38346370x).

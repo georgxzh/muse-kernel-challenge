@@ -1,0 +1,107 @@
+okc run 53ead2c9320442a8 on muse_attention_decode
+submission  /home/georg/muse-kernel-challenge/muse_attention_decode/candidates/attempt10_dynamic_splits.py
+status      ok
+passed      true
+speedup     1.1572652247865123
+speedup_ci  [1.1399062464147145 1.1746242031583098]
+score_us    3254.482999517066
+tests       16/16 passed
+
+scored shapes (µs; speed of light is the reference's bound)
+case                                                         sglang      yours  speedup        sol  
+batch=1 ctx=80000 dist=soft heads=tp8 layer=sliding load=decode 1 page=1      20.43       8.94   2.285x       0.11  
+batch=1 ctx=80000 dist=coherent heads=tp8 layer=full load=decode 1 page=1      31.01      22.51   1.378x       4.27  
+batch=16 ctx=80000 dist=soft heads=tp8 layer=sliding load=decode 16 page=1 spread=agentic      26.85      13.86   1.937x       1.65  
+batch=16 ctx=80000 dist=coherent heads=tp8 layer=full load=decode 16 page=1 spread=agentic     200.11     213.08   0.939x      63.18  
+batch=32 ctx=80000 dist=soft heads=tp8 layer=sliding load=decode 32 page=1 spread=agentic      31.30      16.97   1.844x       3.29  
+batch=32 ctx=80000 dist=coherent heads=tp8 layer=full load=decode 32 page=1 spread=agentic     384.46     421.60   0.912x     126.35  
+batch=1 ctx=80000 dist=soft heads=tp8 layer=sliding load=verify 1 page=1 q_len=8      22.59      11.54   1.957x       0.12  
+batch=1 ctx=80000 dist=coherent heads=tp8 layer=full load=verify 1 page=1 q_len=8      36.54      28.62   1.277x       4.28  
+batch=16 ctx=80000 dist=soft heads=tp8 layer=sliding load=verify 16 page=1 q_len=8 spread=agentic      29.25      22.43   1.304x       1.86  
+batch=16 ctx=80000 dist=coherent heads=tp8 layer=full load=verify 16 page=1 q_len=8 spread=agentic     205.33     262.24   0.783x      63.39  
+batch=32 ctx=80000 dist=soft heads=tp8 layer=sliding load=verify 32 page=1 q_len=8 spread=agentic      34.50      34.97   0.987x       3.72  
+batch=32 ctx=80000 dist=coherent heads=tp8 layer=full load=verify 32 page=1 q_len=8 spread=agentic     389.30     508.34   0.766x     126.78  
+
+profile 0: batch=1 ctx=80000 dist=soft heads=tp8 layer=sliding load=decode 1 page=1
+kernel                                                           GPU time  share  calls
+_attention_parts                                                   3.5 µs  49.1%      1
+_prepare                                                           2.2 µs  30.9%      1
+_combine_gate                                                      1.4 µs  20.0%      1
+total                                                              7.0 µs
+
+profile 1: batch=1 ctx=80000 dist=coherent heads=tp8 layer=full load=decode 1 page=1
+kernel                                                           GPU time  share  calls
+_attention_parts                                                  13.9 µs  78.6%      1
+_combine_gate                                                      2.5 µs  13.9%      1
+_prepare                                                           1.3 µs   7.4%      1
+total                                                             17.7 µs
+
+profile 2: batch=16 ctx=80000 dist=soft heads=tp8 layer=sliding load=decode 16 page=1 spread=agentic
+kernel                                                           GPU time  share  calls
+_attention_parts                                                   5.9 µs  62.6%      1
+_prepare                                                           1.9 µs  20.4%      1
+_combine_gate                                                      1.6 µs  17.0%      1
+total                                                              9.4 µs
+
+profile 3: batch=16 ctx=80000 dist=coherent heads=tp8 layer=full load=decode 16 page=1 spread=agentic
+kernel                                                           GPU time  share  calls
+_attention_parts                                                 205.3 µs  98.1%      1
+_combine_gate                                                      2.2 µs   1.1%      1
+_prepare                                                           1.9 µs   0.9%      1
+total                                                            209.4 µs
+
+profile 4: batch=32 ctx=80000 dist=soft heads=tp8 layer=sliding load=decode 32 page=1 spread=agentic
+kernel                                                           GPU time  share  calls
+_attention_parts                                                   9.9 µs  70.9%      1
+_prepare                                                           2.1 µs  15.3%      1
+_combine_gate                                                      1.9 µs  13.7%      1
+total                                                             14.0 µs
+
+profile 5: batch=32 ctx=80000 dist=coherent heads=tp8 layer=full load=decode 32 page=1 spread=agentic
+kernel                                                           GPU time  share  calls
+_attention_parts                                                 411.7 µs  98.9%      1
+_combine_gate                                                      2.4 µs   0.6%      1
+_prepare                                                           2.1 µs   0.5%      1
+total                                                            416.3 µs
+
+profile 6: batch=1 ctx=80000 dist=soft heads=tp8 layer=sliding load=verify 1 page=1 q_len=8
+kernel                                                           GPU time  share  calls
+_attention_parts                                                   4.7 µs  55.7%      1
+_prepare                                                           2.0 µs  24.0%      1
+_combine_gate                                                      1.7 µs  20.2%      1
+total                                                              8.4 µs
+
+profile 7: batch=1 ctx=80000 dist=coherent heads=tp8 layer=full load=verify 1 page=1 q_len=8
+kernel                                                           GPU time  share  calls
+_attention_parts                                                  20.7 µs  82.4%      1
+_combine_gate                                                      3.0 µs  12.0%      1
+_prepare                                                           1.4 µs   5.6%      1
+total                                                             25.1 µs
+
+profile 8: batch=16 ctx=80000 dist=soft heads=tp8 layer=sliding load=verify 16 page=1 q_len=8 spread=agentic
+kernel                                                           GPU time  share  calls
+_attention_parts                                                  12.2 µs  65.0%      1
+_combine_gate                                                      4.1 µs  21.9%      1
+_prepare                                                           2.5 µs  13.1%      1
+total                                                             18.8 µs
+
+profile 9: batch=16 ctx=80000 dist=coherent heads=tp8 layer=full load=verify 16 page=1 q_len=8 spread=agentic
+kernel                                                           GPU time  share  calls
+_attention_parts                                                 257.6 µs  97.3%      1
+_combine_gate                                                      4.7 µs   1.8%      1
+_prepare                                                           2.5 µs   0.9%      1
+total                                                            264.8 µs
+
+profile 10: batch=32 ctx=80000 dist=soft heads=tp8 layer=sliding load=verify 32 page=1 q_len=8 spread=agentic
+kernel                                                           GPU time  share  calls
+_attention_parts                                                  22.7 µs  68.9%      1
+_combine_gate                                                      6.9 µs  20.9%      1
+_prepare                                                           3.4 µs  10.3%      1
+total                                                             33.0 µs
+
+profile 11: batch=32 ctx=80000 dist=coherent heads=tp8 layer=full load=verify 32 page=1 q_len=8 spread=agentic
+kernel                                                           GPU time  share  calls
+_attention_parts                                                 498.2 µs  98.2%      1
+_combine_gate                                                      6.8 µs   1.3%      1
+_prepare                                                           2.5 µs   0.5%      1
+total                                                            507.5 µs
