@@ -407,3 +407,17 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Rule: group gains above noise, overall higher (1.4473 > scored 1.4279), every
   other shape within -0.2%. Recommend a scored run of attempt 17, pending
   explicit user approval. Checks used today: 10/10.
+
+### Attempt 17 scored
+
+- User approved. submission.py = candidates/attempt17_pdl_late.py (SHA256
+  1c3069c7..., unchanged since check de94bdcac8e8488b; server content_hash
+  a99208c0c61c56ad... identical for check and scored run).
+- Scored run 7e9dd2b58e9746e4 (UTC 2026-11-03): PASS 16/16 tests, 1.4424609x
+  (CI 1.421-1.473), score 2611.024 us. Board row now this run (best kept):
+  1.442x, rank 969 (was 985 at 1.428x). Result in
+  candidates/scored_attempt17_pdl_late.json, profiles/submission.7e9dd2b5....
+- Per shape: sliding decode-1 8.4 us (2.473x), decode-16 13.7, decode-32 16.8,
+  verify-1 10.5; full decode-16 155.7, decode-32 284.4, verify-16 198.6,
+  verify-32 382.5 us (1.01-1.35x). The full-attention batched shapes are now
+  most of the remaining gap: board leaders are at ~3.0-3.3x overall.

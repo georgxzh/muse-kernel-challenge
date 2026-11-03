@@ -1,10 +1,11 @@
 # okc: problem=muse_attention_decode
-"""Hybrid FP8/BF16 PV attention with FA3 for batched full verify."""
+"""Hybrid FP8/BF16 PV attention with FA3 for batched full verify; PDL between the Triton kernels."""
 
 import torch
 import triton as tr
 import triton.language as tl
 import triton.language.extra.cuda.libdevice as libdevice
+from triton.language.extra.cuda import gdc_launch_dependents, gdc_wait
 from sgl_kernel.flash_attn import flash_attn_with_kvcache
 
 ATTENTION_N = 128
@@ -44,6 +45,9 @@ def _prepare(QKV, POS, LOC, KS, VS, KC, VC, Q,
              a / tl.load(KS), mask=is_k[:, None])
     tl.store(VC + (loc[:, None] * HK + kh[:, None]) * D + x[None, :],
              v / tl.load(VS), mask=is_k[:, None])
+    # PDL trigger after this CTA's stores (attempt 16 triggered at the start):
+    # the attention grid is staged only as _prepare drains, never alongside it.
+    gdc_launch_dependents()
 
 
 
@@ -74,6 +78,9 @@ def _attention_parts(Q, KC, VC, PT, LENS, KS, VS, PART, LSE,
     d = tl.arange(0, D)
     n = tl.arange(0, N)
     j = r // G
+    # PDL: launched early (launch_pdl=True); block until _prepare has fully
+    # completed and its q / KV-cache writes are visible. Nothing is written above.
+    gdc_wait()
     q = tl.load(Q + ((b * L + j[:, None]) * HQ + kh * G + r[:, None] % G) * D + d[None, :],
                 mask=r[:, None] < L * G, other=0.)
     seqlen = tl.load(LENS + b)
@@ -115,6 +122,9 @@ def _attention_parts(Q, KC, VC, PT, LENS, KS, VS, PART, LSE,
     tl.store(PART + base[:, None] * D + d[None, :], result, mask=r[:, None] < L * G)
     logsum = tl.where(z > 0, m + tl.log2(z), -float("inf"))
     tl.store(LSE + base, logsum, mask=r < L * G)
+    # Trigger the combine grid only after this CTA's stores, so early-staged
+    # combine CTAs never take SM slots from later attention waves.
+    gdc_launch_dependents()
 
 
 @tr.jit
@@ -128,13 +138,16 @@ def _combine_gate(PART, LSE, QKV, O, HQ: tl.constexpr, HK: tl.constexpr,
     s = tl.arange(0, S)
     d = tl.arange(0, D)
     base = ((b * HK + h // G) * SPLITS + s) * (L * G) + j * G + h % G
+    # The gate comes from the step's input qkv, which no kernel here writes.
+    g = tl.load(QKV + t * STRIDE + (HQ + 2 * HK + h) * D + d).to(tl.float32)
+    # PDL: wait until _attention_parts has completed (partials and LSE visible).
+    gdc_wait()
     lse = tl.load(LSE + base, mask=s < SPLITS, other=-float("inf"))
     w = tl.exp2(lse - tl.max(lse, 0))
     a = tl.load(PART + base[:, None] * D + d[None, :], mask=s[:, None] < SPLITS, other=0)
     a = tl.sum(a * w[:, None], 0) / tl.sum(w, 0)
     a = a.to(tl.bfloat16).to(tl.float32)
     a = a * tl.rsqrt(tl.sum(a * a, 0) / D + 1.e-5)
-    g = tl.load(QKV + t * STRIDE + (HQ + 2 * HK + h) * D + d).to(tl.float32)
     tl.store(O + (t * HQ + h) * D + d, a / (1. + tl.exp(-g)))
 
 
@@ -185,8 +198,8 @@ def kernel_fn(data):
         data["k_scale"], data["v_scale"], partial, lse, hq, hk, d, length,
         cfg["page_size"], data["page_table"].stride(0), splits, chunk, window,
         cfg["sm_scale"] * cfg["qk_scale_factor"], max(16, tr.next_power_of_2(rows)), ATTENTION_N,
-        num_warps=4, num_stages=2)
+        num_warps=4, num_stages=2, launch_pdl=True)
     _combine_gate[(tokens, hq)](
         partial, lse, qkv, out, hq, hk, d, length, stride, splits,
-        tr.next_power_of_2(splits), num_warps=8 if splits >= 128 else 4)
+        tr.next_power_of_2(splits), num_warps=8 if splits >= 128 else 4, launch_pdl=True)
     return out
