@@ -321,3 +321,17 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   scored submission remains attempt 7 until a new exact submit is approved.
 - Attempt 15 still running; compare before asking for a scored submission.
 - 8/10 current-cycle checks used, two reserved. No scored runs used this cycle.
+
+## Attempt 15 GPU result — retain attempt 14
+
+- Job `b71d5bd0b39c4ffc`: PASS 16/16, 1.36917817x, 95% CI
+  [1.34864050, 1.38971584], score 2750.774 us, no flags.
+- N=256 full decode B16/32 takes 166.42/322.93 us versus attempt 14
+  157.49/284.00 us. Reduced residency outweighs the loop-count reduction.
+- Reject promotion. submission.py remains byte-identical to attempt 14, source
+  commit `9ccaccd`, best checked 1.40088781x. Best scored remains 1.38346370x.
+- Recommend one scored submit of exact attempt 14, pending fresh user approval.
+  Improvement is modest and the overall confidence intervals overlap, but
+  full-decode gains over the previous BF16-PV path recur across independent checks.
+- Current UTC-cycle usage: 8/10 checks, two reserved; 0/5 scored submissions.
+  Do not run additional checks this cycle. Every submit still needs approval.
