@@ -188,3 +188,26 @@ Changed shapes count as one group. A candidate is verified better when the group
 - `attempts/attempt10_integer_escape.py` is a fallback only if attempt 8 still fails the i1 shared-memory compiler pass.
 - Compared with attempt 8, replace `where(escape, original_bits, reconstructed_bits)` by integer `reconstructed_bits * min(code, 1) + masked_original_bits`. Escape code zero makes the first term zero; non-escapes load zero original bits, so the representation remains exact.
 - This removes the second consumer of the escape predicate, targeting the old compiler diagnostic at the masked load. No GPU check requested for this file; local syntax only.
+
+## Attempt 11 - single-kernel split-K for the router (UTC 2026-11-03, prefill session)
+
+- attempts/attempt11_serial_router.py, based on scored attempt 7. Router m<=32
+  (_router_small at m=1, _split_mm otherwise) now finishes split-K in the same
+  kernel: each split CTA stores its FP32 partial, bar.sync, acq_rel GPU-scope
+  atomic on a per-tile counter; the last CTA sums the SPLIT partials in fixed
+  order (L2 loads), writes the output and resets the counter (state["counters"],
+  zero at rest; Marlin-workspace pattern). Arithmetic unchanged (permitted
+  BF16 hi/lo split, FP32 accumulation; FP32 GEMV at m=1).
+- Offline SM90 (tools/compile_serial.py): no spills, ATOMG.ADD/EXCH.STRONG.GPU,
+  MEMBAR.ALL.GPU and CCTL.IVALL present (attempts/offline_serial_11.txt).
+- Check 85570a7a053a43ea (UTC 2026-11-03 check 4): PASS 9/9 tests, 30/30
+  shapes, no flags. 1.1617094x (CI 1.1442837-1.1791350), score 4158.355 us.
+- vs mean of attempt 7's two runs: router m=1 +8.48% (5.43 -> 5.07 us), m=8
+  +3.54%, m=16 +3.68%, m=32 -1.26%; changed group +3.55%. Others geo -0.41%;
+  qkv_gate m=8 -3.91% on unchanged code (attempt 7 itself spread 4.3% there).
+- Profile: the single kernel takes about as long as the old two (m=1: 4.2 us vs
+  2.8 + 1.3). The saving is only the ~0.35 us launch gap; the serial reduction
+  (fence + atomic + partial loads) costs about what _finish did.
+- Not verified better (overall 1.1617 < scored 1.1656; one unchanged shape past
+  -3%). submission.py stays attempt 7. Follow-on attempt 12: same epilogue for
+  tiled qkv_gate/pooler (m<=16) and unpooler (m<=8); router m=32 back to _finish.
