@@ -182,3 +182,9 @@ Changed shapes count as one group. A candidate is verified better when the group
 - Against current scored attempt 6 (`c0a7d84f19104a4a`), changed router m=128 improves normalized speedup **8.27%** (10.55 -> 9.67 us); m=256 improves **16.61%** (12.15 -> 10.51 us). No shape regresses more than 3% by normalized per-shape speedup.
 - This satisfies the recorded group-based verified-better rule despite overlapping overall confidence intervals. Promote exact checked source to `submission.py`; recommend a scored submission, pending explicit user approval.
 - Attempt 8 is queued as `0b0059c219a446fa`; candidate 9 remains local and untested. Two checks requested since reset; retain original 10-check cap and two-check reserve.
+
+## Compiler fallback prepared locally (not checked)
+
+- `attempts/attempt10_integer_escape.py` is a fallback only if attempt 8 still fails the i1 shared-memory compiler pass.
+- Compared with attempt 8, replace `where(escape, original_bits, reconstructed_bits)` by integer `reconstructed_bits * min(code, 1) + masked_original_bits`. Escape code zero makes the first term zero; non-escapes load zero original bits, so the representation remains exact.
+- This removes the second consumer of the escape predicate, targeting the old compiler diagnostic at the masked load. No GPU check requested for this file; local syntax only.

@@ -9,6 +9,9 @@ def validate():
             code = exponent - base + 1 if base <= exponent < base + 15 else 0
             restored = ((payload & 128) << 8) | ((base + code - 1) << 7) | (payload & 127) if code else bits
             assert restored == bits, (base, bits, restored)
+            packed_bits = ((payload & 128) << 8) | ((base + code - 1) << 7) | (payload & 127)
+            integer_selected = ((packed_bits & 0xFFFFFFFF) * min(code, 1) + (bits if code == 0 else 0)) & 65535
+            assert integer_selected == bits, (base, bits, integer_selected)
         for a in range(16):
             for b in range(16):
                 packed = a | (b << 4)
