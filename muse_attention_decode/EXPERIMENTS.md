@@ -474,3 +474,23 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   5.12M token-heads at decode-32 is ~116 us of pure issue at 4 IPC/SM. The
   kernel is largely instruction-bound. Next: attempt 23 removes the masks from
   interior tiles (572 instructions per tile).
+
+## Attempt 23 - mask-free interior tiles on full layers
+
+- attempt23_full_nomask.py = attempt 17 with a second loop for WINDOW=0: tiles
+  that lie entirely at or before every query row's position (start + N <=
+  seqlen - L + 1) run without load masks or logit masks; the remaining tail
+  runs the original masked loop. Same arithmetic. Offline SM90 PASS, no spills;
+  the unmasked loop is 572 SASS instructions per tile vs 759 (128 regs).
+- SHA256 136e59279e6e834ee0ae2ebe3cc11797e3231f836e0911935765c62709819db0.
+  Check a70c085065724d67: PASS 16/16, 1.3824846x, score 2724.298 us.
+- Triton full shapes -9.7% as a group: decode-1/16/32 20.5 / 175.1 / 315.5 us
+  (vs 18.8 / 155.7 / 284.4), verify-1 29.9 vs 26.4 us. The second loop adds a
+  pipeline prologue/drain per CTA, and 25% fewer instructions bought nothing:
+  the full-layer kernel is not issue-bound either. Rejected.
+- Summary of attempts 18-23 on the full-layer kernel: neither the dependent
+  page-table latency (st3/st5), half-row gathers (both heads per CTA) nor the
+  instruction count limits it. The board leaders (~3.3x) must run full
+  verify-32 near its 127 us bound (~4.9 TB/s of random 128-byte gathers); ours
+  is 2.3 TB/s and FA3 1.7 TB/s. Finding the limiter needs a profiler we do not
+  have; further blind Triton variants are low-yield.
