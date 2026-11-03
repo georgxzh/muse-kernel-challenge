@@ -114,13 +114,29 @@ def prepare(weights: Weights):
         w = weights[name]
         tiles = w.reshape(w.shape[0] // _TILE, _TILE, w.shape[1] // _TILE, _TILE)
         state[name + "_tiled"] = tiles.permute(0, 2, 3, 1).contiguous()
+    # Concatenate output columns so cuBLAS computes the two allowed BF16
+    # router products in one GEMM, without duplicating activations.
+    state["router_pair"] = torch.cat((hi.T, state["router_lo"].T), dim=1).contiguous()
     return state
 
+
+@triton.jit
+def _join_router(P, Y, SIZE: tl.constexpr, N: tl.constexpr, BLOCK: tl.constexpr):
+    i = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    pos = (i // N) * (2 * N) + i % N
+    hi = tl.load(P + pos, i < SIZE, 0)
+    lo = tl.load(P + pos + N, i < SIZE, 0)
+    tl.store(Y + i, hi + lo, i < SIZE)
 
 def kernel_fn(data: Inputs, state) -> torch.Tensor:
     x, cfg = data["x"], data["config"]
     m, n, k, layer = cfg["m"], cfg["n"], cfg["k"], cfg["layer"]
     router = layer == "router"
+    if router and m > 32:
+        products = torch.mm(x, state["router_pair"], out_dtype=torch.float32)
+        out = torch.empty((m, n), device=x.device, dtype=torch.float32)
+        _join_router[(triton.cdiv(m * n, 256),)](products, out, m * n, n, 256)
+        return out
     tiled = (layer in ("qkv_gate", "pooler") and m <= 16) or (layer == "unpooler" and m <= 8)
     if layer in ("pooler", "unpooler") and m > 32:
         return torch.mm(x, state[layer + "_t"][:, :n])

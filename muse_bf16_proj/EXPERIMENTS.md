@@ -160,3 +160,25 @@ Changed shapes count as one group. A candidate is verified better when the group
 - Archived our original attempt 3 source and exhaustive bit-level packing validator after reconciling the intervening work; result remains compiler failure, not a correctness or speed result.
 - Archived our original attempt 4 source and measured text profile: PASS 1.1356860x, CI 1.1186507-1.1527213; layout gains were already selectively incorporated in the later committed attempts.
 - These archival commits do not modify verified `submission.py` or consume new checks.
+
+## Attempt 8 - lossless packing with unique byte loads
+
+- Candidate `attempts/attempt08.py`, independently based on verified attempt 6. Attempt 7's router change is not included.
+- Retry the exact 12-bit common-path representation from attempt 3, with original BF16 escapes. Changes only the small batches that already use tiled kernels in attempt 6; all other dispatch and arithmetic remains unchanged.
+- Fix hypothesis: attempt 3's repeated exponent-byte indices induced problematic shared-memory layout optimization for predicates. Load each packed byte once in contiguous [N,K/2] order and interleave the nibbles in registers before the dot operand transpose; use two pipeline stages. This is a compiler workaround hypothesis, not yet verified on the judge.
+- Exhaustive CPU format proof from `validate_packing.py` remains applicable and passes; Python syntax passes. GPU compilation, capture, correctness and speed remain to be measured.
+- Second check requested since UTC reset, leaving eight under the user's 10-check cap, including two reserved.
+
+## Candidate 9 prepared locally - larger tiled BF16 batches
+
+- Prepared `attempts/attempt09.py` from verified attempt 6; **not sent to the GPU judge yet**, so no check is consumed.
+- Reuse the established exact 64x64 tiled weights for pooler/unpooler m>32, with BM=64 and split-K=4; same `_tiled_mm` source already used at BM=16 for small batches, followed by the existing FP32 reduction.
+- Rationale: nearby M tiles can share weight cache lines, and split-K supplies 512-2048 CTAs on the timed larger matrices. Test whether direct tiled loads beat the current transposed cuBLAS path; no compression or new precision change.
+- All small batches and router paths match attempt 6. Local syntax passes. Hold GPU spending until attempts 7 and 8 return actionable results.
+
+### Attempt 7 result
+
+- Check `fdea884b00a84aba`: PASS 9/9 and all timed shapes, no flags; **1.1574266x**, CI **1.1400652-1.1747880x**, score 4173.742 us.
+- Against current scored attempt 6 (`c0a7d84f19104a4a`), changed router m=128 improves normalized speedup **8.27%** (10.55 -> 9.67 us); m=256 improves **16.61%** (12.15 -> 10.51 us). No shape regresses more than 3% by normalized per-shape speedup.
+- This satisfies the recorded group-based verified-better rule despite overlapping overall confidence intervals. Promote exact checked source to `submission.py`; recommend a scored submission, pending explicit user approval.
+- Attempt 8 is queued as `0b0059c219a446fa`; candidate 9 remains local and untested. Two checks requested since reset; retain original 10-check cap and two-check reserve.
