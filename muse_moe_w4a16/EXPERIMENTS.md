@@ -234,3 +234,24 @@ Work is confined to this problem on `master`. Other chats share the repository.
   1.7-2.0x (geomean over the six loads); the same kernel would also replace
   Marlin in muse_decode_layer (45-52% of its larger shapes). Cost: several
   hours of build plus multiple blind checks (no local GPU).
+
+## Attempt 9 - native NVFP4 skinny kernel for M<=32 (FAILED timing recheck)
+
+- File attempts/attempt_09.py (submission.py untouched; stays attempt 6).
+- For M<=32: _align_local with 16-row blocks; one Triton kernel per GEMM,
+  grid (16-row expert block, 64-column tile), K loop of 128 values. Native
+  NVFP4 bytes (sliced to the local 32 experts in prepare, no precision change)
+  are decoded exactly by muse_prefill_layer attempt 9's PRMT decoder, split
+  into low/high nibble outputs that feed even-K and odd-K BF16 tl.dot with FP32
+  accumulation. Same BF16 intermediates, SiLU and fused post norm. M>32 keeps
+  attempt 6's Marlin path unchanged.
+- Offline SM90: 108 registers, 0 spills, 12 KB shared, mma.sync generated
+  (attempts/offline_skinny_09.txt, tools/compile_skinny.py).
+- Check 1a0734c7fca341e7 (UTC 2026-11-03 check 1): all 5 correctness tests
+  PASS (bs=1 and bs=4 run the new kernel; rel L2 ~0.0057, same as Marlin), but
+  timing FAILED: decode-1 "recheck failed on repetition 2: relative L2 error
+  8.621e-01". No speedup reported.
+- Root cause: _align_local_routes uses NP=next_pow2(N) lanes. With BM=16 and
+  bs=1 (N=8), a padded segment of 16 slots had only 8 filled with the sentinel;
+  the other 8 kept stale row indices from earlier calls, so other routes'
+  rows were overwritten under graph replay. Previous paths used BM<=N.
