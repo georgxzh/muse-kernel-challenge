@@ -271,3 +271,22 @@ Work is confined to this problem on `master`. Other chats share the repository.
   decoding (no pipelining), and ~1024 CTAs run in two waves at 4 CTAs/SM;
   the per-byte decode (~20 instructions) is also heavy versus Marlin's
   bit-trick dequant.
+
+## Attempt 11 - two-deep register prefetch (correct, still 2.5-3x slower)
+
+- attempt 10 + loads for tiles k+1/k+2 issued before decoding tile k.
+  168 registers, 0 spills (3 CTAs/SM).
+- Check 377dde4081b44322 (UTC 2026-11-03 check 3): PASS 5/5 tests, 6/6 shapes,
+  no flags. 0.670873x (CI 0.660810-0.680936), score 20046.3 us.
+- Skinny shapes: M1 169 us (0.458x; Marlin 50 us), M16 404 us, M32 525 us,
+  M8 289 us. Latency hiding gained only 20-30%: the kernel is instruction-bound.
+- SASS of the inner loop (cuobjdump, M=1 GEMM1): ~19 instructions per weight
+  value per thread (LOP3 235, IMAD 204, PRMT 140, byte-wise LDG 120, HADD2 96,
+  FMUL 96, STS 84 for the dot-operand layout change, F2FP 52, HMMA 16).
+  Marlin needs roughly 2 per value (word-level bit-trick dequant, bf16x2 scale
+  multiply, cp.async pipelining, no shared-memory round trip for weights).
+- Estimate for a redesigned Triton version (int32 word loads, word-level PRMT
+  decode ~3/value, bf16x2 scale like Marlin): ~5 instructions per value,
+  i.e. roughly Marlin parity on M1/M8 and still slower on M16/M32. Beating
+  Marlin clearly needs Marlin-grade CUDA, not feasible before the deadline.
+- Recommendation: stop the skinny-kernel line; submission.py stays attempt 6.

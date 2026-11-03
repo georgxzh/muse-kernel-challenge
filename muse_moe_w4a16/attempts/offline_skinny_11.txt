@@ -1,0 +1,5 @@
+Triton 3.5.1
+gemm1 w13 M=1 BN=64 BKP=64 warps=4: shared=20480 mma_instr=16 ::     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 168 registers, used 1 barriers
+gemm1 w13 M=32 BN=64 BKP=64 warps=4: shared=20480 mma_instr=16 ::     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 168 registers, used 1 barriers
+gemm2 w2 M=1 BN=64 BKP=64 warps=4: shared=20480 mma_instr=16 ::     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 168 registers, used 1 barriers
+gemm2 w2 M=32 BN=64 BKP=64 warps=4: shared=20480 mma_instr=16 ::     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 168 registers, used 1 barriers
