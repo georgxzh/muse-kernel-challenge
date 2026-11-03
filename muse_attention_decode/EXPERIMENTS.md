@@ -388,3 +388,22 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Rule: group gains, overall higher (1.4462 > scored 1.4279), but two shapes past
   -3% (one known-noisy). Next: attempt 17 moves _prepare's trigger to its end to
   test whether early staging of attention CTAs costs sliding decode-16.
+
+## Attempt 17 - PDL with _prepare's trigger after its stores
+
+- candidates/attempt17_pdl_late.py = attempt 16 with _prepare calling
+  gdc_launch_dependents() after its cache stores instead of at its start.
+  Offline SM90 PASS, no spills (candidates/offline_attempt17_pdl_late.txt).
+- Source SHA256: 1c3069c7c9123438bf0361aacf11ef2b1a19ae305f4ad8f57819e06977126d67
+- Check de94bdcac8e8488b (UTC 2026-11-03 check 10): PASS 16/16 tests, 12/12
+  shapes, no flags. 1.4473404x (CI 1.4256303-1.4690505), score 2602.221 us.
+- vs mean of attempt 14's two runs, PDL-path group +3.98% (attempt 16: +3.47%):
+  sliding decode-1 +15.50%, decode-16 +8.23% (attempt 16: -3.87%), decode-32
+  +4.45%, verify-1 +6.01%, verify-16 +1.31%, verify-32 -0.15%; full decode-1
+  +6.43%, decode-16 +1.02%, verify-1 +4.58%, decode-32 -6.21%. FA3 shapes +0.08/-0.06%.
+- full decode-32: attempts 16 and 17 both ran 284 us; attempt 14 ran 250.1 us
+  (scored) and about 284 us (check 300cb7ec), so against the check alone it is
+  level; the -6% is attempt 14's fast scored sample pulling the mean.
+- Rule: group gains above noise, overall higher (1.4473 > scored 1.4279), every
+  other shape within -0.2%. Recommend a scored run of attempt 17, pending
+  explicit user approval. Checks used today: 10/10.
