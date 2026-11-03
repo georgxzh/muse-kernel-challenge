@@ -347,3 +347,12 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   at 1.38346370x until this job completes.
 - Current-cycle usage: 8/10 checks (two reserved), 1/5 scored runs. No further
   scored submission is authorized by this approval.
+
+## Attempt 14 scored result (recorded UTC 2026-11-03 from the prefill session)
+
+- Scored job 1f40b617a3c14d74: PASS, speedup 1.4279x, score 2637.58 us; it is
+  our board row (rank 984 of 1308 at 15:5x UTC). Server content_hash c79cc2b7...
+  equals check 300cb7ecb4304bfa's (1.4009x), so the scored code is the checked code.
+- submission.py is byte-identical to candidates/attempt14_pv_hybrid.py
+  (SHA256 7f0dbde8...). Lowest check on this board is attempt 13 at 0.9858x
+  (66d0fa57bd7f403b, never scored); every scored run has been >= 1.28x.
