@@ -162,3 +162,48 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Current `submission.py` is byte-identical to `candidates/attempt07_hybrid.py`.
 - Today's usage: 6/10 checks, 3/5 scored submissions. 4 checks remain, with 2
   reserved; 2 scored submissions remain and need fresh approval each time.
+
+## New UTC quota cycle — 2026-11-03 (evening Nov 2 Toronto)
+
+- Server reset observed at 01:03 UTC: 0 checks/submissions used. The server now
+  advertises 20 checks and 10 scored runs/day; keep the user's stricter limits of
+  10 checks / 5 scored, using at most 8 checks and always reserving 2.
+- Existing best remains scored attempt 7, 1.38346370x; no change to submission.py.
+
+## Attempt 8 — FA3-style scaled FP8 probability/value multiply
+
+- File: `candidates/attempt08_fp8_pv.py`; check `0ca845bb169f461d`: PASS 16/16, 1.29608350x, CI [1.27664225, 1.31552475], score 2905.908 us.
+- Replace BF16 PV operands with FP8 P and the existing unchanged FP8 V values.
+  Compute softmax max/sum and output accumulation in FP32. Quantize P only after
+  multiplication by 256, and divide the final weighted output by that same factor.
+- Precision basis: FA3's FP8 mainloop defines Element as E4M3, creates its P
+  operand with make_tensor_like<Element>, converts softmax scores into it, and
+  uses Element for both PV operands. Its softmax.h explicitly applies an FP8
+  max offset of 8 (x256) to reduce underflow. This matches baseline-internal
+  arithmetic; BF16 input/output boundaries and FP8 cache storage are preserved.
+- Source evidence reviewed:
+  https://github.com/Dao-AILab/flash-attention/blob/main/hopper/mainloop_fwd_sm90_tma_gmma_ws.hpp
+  (Is_FP8 / Element; TiledMmaPV; tOrP conversion at lines 1073-1075 / 1197-1199)
+  https://github.com/Dao-AILab/flash-attention/blob/main/hopper/softmax.h
+  (scale_apply_exp2, Max_offset=8 discussion).
+- Every key/value is loaded and processed. No pruning, attention-weight threshold,
+  sparse mask, output caching, or host input reads. Keep full causal/window masks.
+- Offline H200 compilation passed decode, verify, page 64, and long combine.
+- New cycle: 1/10 checks used; 9 left under user cap, including 2 reserved.
+  No new-cycle scored submissions made or approved.
+
+- Attempt 8 decision: reject universal promotion. Full decode B=1/16/32 improves
+  to 19.97/155.78/284.54 us, but full verify B=16/32 takes 267.00/498.56 us
+  versus current FA3 ~199/384 us. Existing 1.383x entry remains current.
+- Validation reports no flags/rejections. Largest whole-test relative error was
+  0.09713 against 0.15; coherent tests were 0.04112/0.03810 against 0.108/0.111.
+- Added source evidence: flash_fwd_kernel_sm90.h line 385 explicitly selects
+  Max_offset=8 for Is_FP8, matching the x256 scaling in attempt 8.
+- Offline compiler correction: model real CUDA tensor pointer alignment with
+  tt.divisibility=16. Previous reports omitted this and were conservative;
+  correctness compilation remains valid, but old register/occupancy estimates
+  should not guide new tuning. Aligned FP8 decode/verify reports use 120/168
+  registers and 22/28 KB shared memory for full attention, with no spills.
+- Prepared two independent drafts (not yet measured): attempt09_l2_loads.py uses
+  .cg on KV loads; attempt10_dynamic_splits.py fixes total CTA count using H200
+  occupancy and computes chunk sizes from live GPU sequence lengths. Both compile.

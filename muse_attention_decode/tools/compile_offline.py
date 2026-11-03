@@ -31,12 +31,17 @@ target = GPUTarget("cuda", 90, 32)
 
 def compile_one(name, signature, constants, **options):
     fn = getattr(module, name)
-    source = ASTSource(fn, signature=signature, constexprs=constants)
+    if name == "_attention_parts" and len(sys.argv) > 2:
+        options["num_stages"] = int(sys.argv[2])
+    # CUDA allocator tensors passed to the real JIT have 16-byte aligned bases.
+    attrs = {(fn.arg_names.index(arg),): [["tt.divisibility", 16]]
+             for arg, dtype in signature.items() if dtype.startswith("*")}
+    source = ASTSource(fn, signature=signature, constexprs=constants, attrs=attrs)
     kernel = triton.compile(source, target=target, options=options)
     print(name, constants, "shared", kernel.metadata.shared, flush=True)
     report_dir = root / ".tools" / "resource-reports"
     report_dir.mkdir(exist_ok=True)
-    label = name + "-" + str(constants.get("M", 0)) + "-" + str(constants.get("N", 0)) + "-" + str(constants.get("S", 0))
+    label = name + "-" + "-".join(str(constants.get(k, 0)) for k in ("M", "N", "S", "WINDOW")) + "-w" + str(options.get("num_warps")) + "-st" + str(options.get("num_stages", 0))
     ptx_path = report_dir / (label + ".ptx")
     ptx_path.write_text(kernel.asm["ptx"])
     ptxas = Path(triton.__file__).parent / "backends" / "nvidia" / "bin" / "ptxas"
@@ -56,7 +61,7 @@ if hasattr(module, "_attention_parts"):
         compile_one("_attention_parts", dict(Q="*fp8e4nv", KC="*fp8e4nv", VC="*fp8e4nv", PT="*i32",
                                             LENS="*i32", KS="*fp32", VS="*fp32", PART="*fp32", LSE="*fp32"),
                     dict(HQ=16, HK=2, D=64, L=length, PAGE=page, PT_STRIDE=86008,
-                         SPLITS=42, CHUNK=2048, **({"WINDOW": 0} if "WINDOW" in module._attention_parts.arg_names else {}), SCALE=0.6841258107984375, M=max(16, length * 8), N=getattr(module, "ATTENTION_N", 64)),
+                         SPLITS=42, CHUNK=getattr(module, "ATTENTION_CHUNK", 2048), **({"WINDOW": 0} if "WINDOW" in module._attention_parts.arg_names else {}), SCALE=0.6841258107984375, M=max(16, length * 8), N=getattr(module, "ATTENTION_N", 64)),
                     num_warps=getattr(module, "ATTENTION_WARPS", 4), num_stages=getattr(module, "ATTENTION_STAGES", 2))
     for length, splits in ((1, 42), (8, 513)):
         compile_one("_combine_gate", dict(PART="*fp32", LSE="*fp32", QKV="*bf16", O="*bf16"),
