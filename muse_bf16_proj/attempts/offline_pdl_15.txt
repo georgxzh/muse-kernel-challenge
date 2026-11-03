@@ -1,0 +1,14 @@
+Triton 3.5.1
+PASS _split_mm {'M': 17, 'N': 256, 'K': 8192, 'SPLIT': 16, 'ROUTER': True, 'BM': 32, 'BN': 32, 'BK': 64, 'SERIAL': False} regs=72 spills=0 shared=24576 ACQBULK@[] PREEXIT@[355] first_load@[117] last_store@[354]
+PASS _finish {'SIZE': 4352, 'SPLIT': 16, 'BLOCK': 256} regs=32 spills=0 shared=2048 ACQBULK@[12] PREEXIT@[] first_load@[29] last_store@[133]
+PASS _split_mm {'M': 24, 'N': 256, 'K': 8192, 'SPLIT': 16, 'ROUTER': True, 'BM': 32, 'BN': 32, 'BK': 64, 'SERIAL': False} regs=72 spills=0 shared=24576 ACQBULK@[] PREEXIT@[355] first_load@[117] last_store@[354]
+PASS _finish {'SIZE': 6144, 'SPLIT': 16, 'BLOCK': 256} regs=32 spills=0 shared=2048 ACQBULK@[12] PREEXIT@[] first_load@[29] last_store@[133]
+PASS _split_mm {'M': 32, 'N': 256, 'K': 8192, 'SPLIT': 16, 'ROUTER': True, 'BM': 32, 'BN': 32, 'BK': 64, 'SERIAL': False} regs=72 spills=0 shared=24576 ACQBULK@[] PREEXIT@[354] first_load@[117] last_store@[353]
+PASS _finish {'SIZE': 8192, 'SPLIT': 16, 'BLOCK': 256} regs=32 spills=0 shared=2048 ACQBULK@[12] PREEXIT@[] first_load@[29] last_store@[131]
+PASS _split_mm {'M': 2, 'N': 256, 'K': 8192, 'SPLIT': 16, 'ROUTER': True, 'BM': 16, 'BN': 32, 'BK': 64, 'SERIAL': True} regs=48 spills=0 shared=20480 ACQBULK@[] PREEXIT@[] first_load@[58] last_store@[619]
+PASS _split_mm {'M': 8, 'N': 256, 'K': 8192, 'SPLIT': 16, 'ROUTER': True, 'BM': 16, 'BN': 32, 'BK': 64, 'SERIAL': True} regs=48 spills=0 shared=20480 ACQBULK@[] PREEXIT@[] first_load@[58] last_store@[617]
+PASS _split_mm {'M': 16, 'N': 256, 'K': 8192, 'SPLIT': 16, 'ROUTER': True, 'BM': 16, 'BN': 32, 'BK': 64, 'SERIAL': True} regs=48 spills=0 shared=20480 ACQBULK@[] PREEXIT@[] first_load@[58] last_store@[617]
+PASS _join_router {'SIZE': 8448, 'N': 256, 'BLOCK': 256} regs=12 spills=0 shared=0 ACQBULK@[7] PREEXIT@[] first_load@[21] last_store@[28]
+PASS _join_router {'SIZE': 32768, 'N': 256, 'BLOCK': 256} regs=12 spills=0 shared=0 ACQBULK@[7] PREEXIT@[] first_load@[21] last_store@[28]
+PASS _join_router {'SIZE': 65536, 'N': 256, 'BLOCK': 256} regs=12 spills=0 shared=0 ACQBULK@[7] PREEXIT@[] first_load@[21] last_store@[28]
+FAILURES: none

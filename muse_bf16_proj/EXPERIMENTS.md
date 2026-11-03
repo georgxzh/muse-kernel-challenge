@@ -270,3 +270,28 @@ Changed shapes count as one group. A candidate is verified better when the group
 - Status of the three follow-up ideas (UTC 2026-11-03): decode_layer port
   ~+1-1.5% on changed shapes (noise); o projection: cuBLAS wins; more K-splits:
   only unpooler benefits. bf16_proj stays at scored attempt 12 (1.1701x).
+
+## Attempt 15: PDL into the router's second pass (attention_decode attempt-17 rule)
+
+- File attempts/attempt15_pdl_router.py = scored attempt 12 + programmatic
+  dependent launch on the router's two-kernel paths only:
+  m=32: _split_mm (non-serial) triggers after its partial store -> _finish
+  (launch_pdl, gdc_wait before reading partials). m>32: cuBLAS products ->
+  _join_router (launch_pdl, gdc_wait first). Nothing written before a wait.
+  Every other layer and m is a single kernel: unchanged. Math unchanged.
+- Offline SM90 (tools/compile_pdl.py, Triton 3.5.1): PASS, no spills; SASS
+  ACQBULK before every global access, PREEXIT after the last store
+  (attempts/offline_pdl_15.txt).
+- Source SHA256: 82505261ae138c0df9b6d4a36f5a3f1d42953e81ea9203fa8b21f5333d928a67
+- Check e76469ef9968411f (UTC 2026-11-03): PASS 9/9 tests, 30 shapes, no
+  flags. 1.1672726x (CI 1.1497636-1.1847817), score 4138.536 us.
+- vs mean of attempt 12's two runs: changed router shapes +6.51% as a group
+  (decode-32 m=32 +4.26%, verify-16 m=128 +7.03%, verify-32 m=256 +8.28%).
+  Unchanged shapes -0.85% on average (router decode-1, unchanged code, -5.06%):
+  a slower run. Overall below scored 1.1701.
+- Repeat check 1f9881987e4948f8 of the identical file returned "duplicate": the
+  server dedupes identical content, so a second sample needs a scored run (the
+  board keeps the best run) or a changed file.
+- Status: changed shapes verified faster (+6.5%, well above noise); overall
+  criterion not met on this run's slower machine. Expected board effect about
+  +0.6% (3 of 30 shapes). Scored run pending user decision.
