@@ -281,3 +281,16 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Job `66d0fa57bd7f403b`: PASS 16/16, 0.98575904x, 95% CI [0.97097265, 1.00612524], score 3820.711 us.
 - 16-row BF16 query tiling further increases repeated cache traffic; full verify 520/1016 us at B16/32. Reject promotion.
 - submission.py remains byte-identical to scored attempt 7 (1.38346370x).
+
+## Attempt 14 — conservative PV hybrid (pending)
+
+- File: `candidates/attempt14_pv_hybrid.py`; check `300cb7ecb4304bfa`.
+- Preserve current FA3 full batched verify and BF16-PV sliding attention. Use
+  attempt 8 scaled FP8 PV only for custom full attention, where repeated tests
+  showed about 4-6% improvements. No exact-shape or input-value dispatch.
+- All required keys/values remain processed; FP32 softmax and accumulation,
+  BF16 output boundary, and CUDA graph behavior are unchanged.
+- Offline SM90 compilation and whitespace checks pass. Combined performance
+  estimate is approximately 1.41x; await measured correctness and timing.
+- 7/10 current-cycle checks used. Three remain, of which two stay reserved.
+  No scored submissions made or approved in this UTC cycle.
