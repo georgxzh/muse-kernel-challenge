@@ -242,3 +242,16 @@ Changed shapes count as one group. A candidate is verified better when the group
   161d1b98... equals check 171753ddbf07418b's, so the scored code is the checked code.
 - Board row is now this job: 1.1701x, rank 1297 of 1703 (was 1.1656x, ~1314).
   UTC 2026-11-03 usage: 5 checks, 2 scored runs.
+
+## Attempt 13 - 16 K-splits for every tiled shape (regression)
+
+- attempts/attempt13_tiled_split16.py = scored attempt 12 with SPLIT 16 (was 8)
+  for tiled qkv_gate/pooler (m<=16) and unpooler (m<=8). 52-54 registers, no
+  spills (attempts/offline_serial_13.txt).
+- Check 8edd2e244dd04e87 (UTC 2026-11-03 check 6): PASS 9/9, 30/30 shapes, no
+  flags, but 1.1471860x (CI 1.1299782-1.1643938). vs mean of attempt 12's
+  check + scored run: pooler m=1/8/16 -6.5/-8.6/-9.7%, qkv_gate m=16 -5.3%,
+  qkv_gate m=1/8 -1.0/-1.2%, unpooler m=1/8 +3.3/+3.7%.
+- More splits help only the layer with few output tiles (unpooler: 128 CTAs at
+  split 8); for the big layers the extra partial traffic and longer last-CTA
+  reduction cost more than the added parallelism. Rejected.
