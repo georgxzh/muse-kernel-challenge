@@ -141,3 +141,16 @@ Changed shapes count as one group. A candidate is verified better when the group
 - router m=1 uses unchanged code but ran 1.853, 1.881, 1.791, 1.844, 1.797 across attempts 2, 2, 5, 6, 6. Its two lowest readings are in the two runs of this session's later code, so a small real loss is not ruled out.
 - Reproduced again: router m=256 +34.9%, pooler m=128 +10.4%, unpooler m=128 +3.6%.
 - Budget after this run: 4 checks left (2 above the reserve), 2 scored runs left.
+
+## Continuation after UTC quota reset (2026-11-03 UTC / Nov 2 Toronto)
+
+- Reconciled newer committed attempts 5/6 before editing. Current verified main is attempt 6, scored 1.1466x (commit e629891). Preserve it while checking new candidates.
+- Server now advertises 20 checks and 10 scored runs, all unused for this problem since reset. Retain the user's stricter original cap of 10 checks, at most eight used and two reserved; request permission for every scored submission.
+
+## Attempt 7 - one cuBLAS GEMM for the two router products
+
+- Candidate `attempts/attempt07.py`, based on current verified attempt 6.
+- For router m>32, concatenate hi/lo weight columns once in prepare as exact BF16 [K,2N]. One BF16-input, FP32-output cuBLAS GEMM computes both products; a small Triton kernel adds the FP32 halves.
+- Algebra matches the baseline's two separate hi/lo products. Activations are neither duplicated nor rounded, original FP32 router remains available, and all activation-dependent work is timed.
+- Rationale: use optimized cuBLAS for larger router matrices and improve occupancy by doubling output width; avoid two GEMM launches and Triton's repeated tiled weight loads. All other shape paths are byte-for-byte unchanged from attempt 6.
+- Local Python syntax passes. First check requested after the UTC reset; source has no new GPU compilation complexity except a masked FP32 add kernel.
