@@ -269,3 +269,9 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Job `ac4f2870058c4d84`: PASS 16/16, 1.11308153x, 95% CI [1.09638531, 1.13354513], score 3383.669 us.
 - 32-row FP8 query tiling repeats cache traffic and slows batched verify substantially; reject promotion.
 - submission.py remains byte-identical to scored attempt 7 (1.38346370x).
+
+## Attempt 12 GPU result
+
+- Job `1fc675802a884460`: PASS 16/16, 1.07914559x, 95% CI [1.06295841, 1.09533278], score 3490.076 us.
+- 32-row BF16 query tiling reduces registers but slows full verify to 411/786 us at B16/32; reject promotion.
+- submission.py remains byte-identical to scored attempt 7 (1.38346370x).
