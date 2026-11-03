@@ -7,8 +7,8 @@
 - 95% speedup CI [1.36271175, 1.40421566]; equivalent score 2722.370 us.
 - Started with a submitted 1.11109588x fused-FA3 entry, improved to a submitted
   1.28034635x custom-sliding entry, then to the current native-FP8/FA3 hybrid.
-- New UTC cycle: 5/10 checks used under user cap (5 left, including 2 reserved),
-  0/5 scored submissions used. Four checks pending (attempts 9-12).
+- New UTC cycle: 6/10 checks used under user cap (4 left, including 2 reserved),
+  0/5 scored submissions used. Five checks pending (attempts 9-13).
   Prior UTC cycle used 6 checks and 3 scored runs. Ask before every new submit.
 - Current hybrid retains FA3 for batched full verify and uses custom native FP8 QK,
   FP32 online softmax/accumulation and BF16 PV elsewhere. All keys in each context
@@ -236,3 +236,18 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Aligned full-verify BF16-PV resource comparison: current 64-row body uses
   202 registers/thread; 32-row draft uses 140, potentially raising residency from
   2 to 3 CTAs/SM. This is an estimate, not a measured speedup.
+
+## Attempt 13 — 16-row query tiles (pending)
+
+- File: `candidates/attempt13_query_tiles16_bf16.py`, job `66d0fa57bd7f403b`.
+- Split verify into four 16-row query groups, using FP8 QK / BF16 PV as in the
+  current hybrid. All groups traverse all required keys and have disjoint output
+  scratch rows. No changes to precision or input/output semantics.
+- Aligned SM90 compile PASS, 128 attention registers/thread and 22 KB shared
+  memory, with no attention spills. This supports an estimated four CTAs/SM.
+- 6/10 new-cycle checks used; 4 left under user cap, including 2 reserved. No
+  more exploratory checks until pending results guide the final consolidation.
+- Added tools/compare_profiles.py: normalize candidate paired ratios against
+  the current scored run's per-case baseline and recompute load weights. It
+  reproduces 1.38346370x for the current run. With only existing attempt 8 gains,
+  estimated combination is 1.41345x; this is not a measured result or a promotion.
