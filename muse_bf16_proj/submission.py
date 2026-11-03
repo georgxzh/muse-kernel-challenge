@@ -8,6 +8,8 @@ import triton.language as tl
 
 
 _TILE = 64  # weight tile; every tiled layer's N and K are multiples
+SERIAL_ROUTER = True   # router m<=16: one kernel, in-kernel split-K reduction
+SERIAL_TILED = True    # tiled qkv_gate/pooler/unpooler: one kernel as well
 
 
 class Weights(TypedDict):
@@ -30,10 +32,36 @@ class Inputs(TypedDict):
     config: Config
 
 
+_COUNTERS = 4096  # per-tile arrival counters; every launch uses fewer tiles
+
+
 @triton.jit
-def _split_mm(X, W, L, P, M: tl.constexpr, N: tl.constexpr,
+def _serial_reduce(P, Y, CNT, tile, offs, mask, acc,
+                   MN: tl.constexpr, SPLIT: tl.constexpr):
+    """Split-K epilogue without a second kernel.
+
+    Each split CTA stores its FP32 partial, then counts in on its output tile.
+    The last CTA to arrive sums all SPLIT partials in fixed order (s = 0..SPLIT-1),
+    writes the output, and resets the counter to zero for the next call: the
+    self-resetting lock pattern SGLang's Marlin workspace uses. Counters hold
+    no data between calls.
+    """
+    tl.store(P + tl.program_id(2) * MN + offs, acc, mask)
+    tl.debug_barrier()          # every thread's partial is issued before the release
+    ticket = tl.atomic_add(CNT + tile, 1, sem="acq_rel", scope="gpu")
+    if ticket == SPLIT - 1:
+        total = tl.load(P + offs, mask, other=0.0, cache_modifier=".cg")
+        for s in tl.static_range(1, SPLIT):
+            total += tl.load(P + s * MN + offs, mask, other=0.0, cache_modifier=".cg")
+        tl.store(Y + offs, total.to(Y.dtype.element_ty), mask)
+        tl.atomic_xchg(CNT + tile, 0, sem="relaxed", scope="gpu")
+
+
+@triton.jit
+def _split_mm(X, W, L, P, Y, CNT, M: tl.constexpr, N: tl.constexpr,
               K: tl.constexpr, SPLIT: tl.constexpr, ROUTER: tl.constexpr,
-              BM: tl.constexpr, BN: tl.constexpr, BK: tl.constexpr):
+              BM: tl.constexpr, BN: tl.constexpr, BK: tl.constexpr,
+              SERIAL: tl.constexpr):
     mi = tl.program_id(0) * BM + tl.arange(0, BM)
     ni = tl.program_id(1) * BN + tl.arange(0, BN)
     si = tl.program_id(2)
@@ -54,14 +82,19 @@ def _split_mm(X, W, L, P, M: tl.constexpr, N: tl.constexpr,
             low = tl.dot(x, lo, low)
     if ROUTER:
         acc += low
-    tl.store(P + si * M * N + mi[:, None] * N + ni[None, :], acc,
-             (mi[:, None] < M) & (ni[None, :] < N))
+    offs = mi[:, None] * N + ni[None, :]
+    mask = (mi[:, None] < M) & (ni[None, :] < N)
+    if SERIAL:
+        _serial_reduce(P, Y, CNT, tl.program_id(0) * tl.num_programs(1) + tl.program_id(1),
+                       offs, mask, acc, M * N, SPLIT)
+    else:
+        tl.store(P + si * M * N + offs, acc, mask)
 
 
 @triton.jit
-def _tiled_mm(X, T, P, M: tl.constexpr, N: tl.constexpr, K: tl.constexpr,
+def _tiled_mm(X, T, P, Y, CNT, M: tl.constexpr, N: tl.constexpr, K: tl.constexpr,
               SPLIT: tl.constexpr, BM: tl.constexpr, BN: tl.constexpr,
-              BK: tl.constexpr):
+              BK: tl.constexpr, SERIAL: tl.constexpr):
     # T holds the same BF16 weights as contiguous BK x BN tiles, ordered by
     # (output tile, K tile), so one CTA reads its weights sequentially.
     mi = tl.program_id(0) * BM + tl.arange(0, BM)
@@ -76,8 +109,13 @@ def _tiled_mm(X, T, P, M: tl.constexpr, N: tl.constexpr, K: tl.constexpr,
                     mi[:, None] < M, 0)
         w = tl.load(T + (tn * (K // BK) + tk) * BK * BN + kj[:, None] * BN + nj[None, :])
         acc = tl.dot(x, w, acc)
-    tl.store(P + si * M * N + mi[:, None] * N + tn * BN + nj[None, :], acc,
-             mi[:, None] < M)
+    offs = mi[:, None] * N + tn * BN + nj[None, :]
+    mask = (mi[:, None] < M) & (nj[None, :] < BN)
+    if SERIAL:
+        _serial_reduce(P, Y, CNT, tl.program_id(0) * tl.num_programs(1) + tn,
+                       offs, mask, acc, M * N, SPLIT)
+    else:
+        tl.store(P + si * M * N + offs, acc, mask)
 
 
 @triton.jit
@@ -90,9 +128,9 @@ def _finish(P, Y, SIZE: tl.constexpr, SPLIT: tl.constexpr,
 
 
 @triton.jit
-def _router_small(X, W, P, M: tl.constexpr, N: tl.constexpr,
+def _router_small(X, W, P, Y, CNT, M: tl.constexpr, N: tl.constexpr,
                   K: tl.constexpr, SPLIT: tl.constexpr,
-                  BN: tl.constexpr, BK: tl.constexpr):
+                  BN: tl.constexpr, BK: tl.constexpr, SERIAL: tl.constexpr):
     row = tl.program_id(0)
     ni = tl.program_id(1) * BN + tl.arange(0, BN)
     si = tl.program_id(2)
@@ -100,7 +138,11 @@ def _router_small(X, W, P, M: tl.constexpr, N: tl.constexpr,
     x = tl.load(X + row * K + ki).to(tl.float32)
     w = tl.load(W + ni[:, None] * K + ki[None, :], ni[:, None] < N, 0)
     v = tl.sum(w * x[None, :], axis=1)
-    tl.store(P + si * M * N + row * N + ni, v, ni < N)
+    if SERIAL:
+        _serial_reduce(P, Y, CNT, row * tl.num_programs(1) + tl.program_id(1),
+                       row * N + ni, ni < N, v, M * N, SPLIT)
+    else:
+        tl.store(P + si * M * N + row * N + ni, v, ni < N)
 
 
 def prepare(weights: Weights):
@@ -117,6 +159,8 @@ def prepare(weights: Weights):
     # Concatenate output columns so cuBLAS computes the two allowed BF16
     # router products in one GEMM, without duplicating activations.
     state["router_pair"] = torch.cat((hi.T, state["router_lo"].T), dim=1).contiguous()
+    # Split-K arrival counters: zero at rest, reset by each tile's last CTA.
+    state["counters"] = torch.zeros((_COUNTERS,), dtype=torch.int32, device=hi.device)
     return state
 
 
@@ -148,19 +192,29 @@ def kernel_fn(data: Inputs, state) -> torch.Tensor:
     out = torch.empty((m, n), device=x.device,
                       dtype=torch.float32 if router else torch.bfloat16)
     partial = torch.empty((split, m, n), device=x.device, dtype=torch.float32)
+    # Single-kernel split-K (in-kernel last-CTA reduction) for the router;
+    # the other layers keep the separate _finish pass.
+    # Router m=32 lost 1.3% with the in-kernel reduction (attempt 11): keep _finish there.
+    serial = (SERIAL_ROUTER and m <= 16) if router else SERIAL_TILED
+    cnt = state["counters"]
     if router and m == 1:
-        _router_small[(m, triton.cdiv(n, 4), split)](
-            x, state["router"], partial, m, n, k, split, 4, k // split,
+        grid = (m, triton.cdiv(n, 4), split)
+        _router_small[grid](
+            x, state["router"], partial, out, cnt, m, n, k, split, 4, k // split, serial,
             num_warps=4)
     elif tiled:
-        _tiled_mm[(triton.cdiv(m, bm), n // _TILE, split)](
-            x, state[layer + "_tiled"], partial, m, n, k, split, bm, _TILE, _TILE,
+        grid = (triton.cdiv(m, bm), n // _TILE, split)
+        _tiled_mm[grid](
+            x, state[layer + "_tiled"], partial, out, cnt, m, n, k, split, bm, _TILE, _TILE, serial,
             num_warps=4, num_stages=3)
     else:
         w = state["router_hi"] if router else state[layer]
         lo = state["router_lo"] if router else w
-        _split_mm[(triton.cdiv(m, bm), triton.cdiv(n, bn), split)](
-            x, w, lo, partial, m, n, k, split, router, bm, bn, 64,
+        grid = (triton.cdiv(m, bm), triton.cdiv(n, bn), split)
+        _split_mm[grid](
+            x, w, lo, partial, out, cnt, m, n, k, split, router, bm, bn, 64, serial,
             num_warps=8 if bm == 128 else 4, num_stages=3)
-    _finish[(triton.cdiv(m * n, 256),)](partial, out, m * n, split, 256)
+    assert grid[0] * grid[1] <= _COUNTERS
+    if not serial:
+        _finish[(triton.cdiv(m * n, 256),)](partial, out, m * n, split, 256)
     return out

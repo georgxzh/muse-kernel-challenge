@@ -231,3 +231,14 @@ Changed shapes count as one group. A candidate is verified better when the group
   every changed shape within -3% of the attempt 7 mean; one unchanged-code shape
   past -3% (pooler m=256), the same situation the user waived for attempt 6.
   Recommend a scored run, pending explicit user approval.
+
+### Attempt 12 scored run
+
+- User explicitly approved one scored run. Pre-submit: attempts/attempt12_serial_all.py
+  SHA256 8f5e49a6... equals the hash recorded before the check and is unchanged
+  since commit f1e36f5; submission.py = attempt12_serial_all.py.
+- Scored job f7b3322f650247af: PASS 9/9 tests, 30/30 shapes, no flags.
+  1.1701004x (CI 1.1525489-1.1876519), score 4128.535 us. Server content_hash
+  161d1b98... equals check 171753ddbf07418b's, so the scored code is the checked code.
+- Board row is now this job: 1.1701x, rank 1297 of 1703 (was 1.1656x, ~1314).
+  UTC 2026-11-03 usage: 5 checks, 2 scored runs.
