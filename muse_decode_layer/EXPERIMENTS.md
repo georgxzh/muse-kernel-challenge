@@ -340,3 +340,17 @@ correctness or performance result.
   (33.2 us), and cuBLAS o is 7.1 us here versus 4.7 us standalone.
 - Not verified better (overall below scored 1.1437; unchanged shapes past -3%).
   Next: attempt 11 restores the old split-K o path (_gemm) at T<=8.
+
+## Attempt 11: attempt 10 with attempt 8's split-K o path at T<=8
+
+- File candidate_bf16_o_splitk.py: identical to attempt 10 except o at T<=8
+  uses _gemm (_dense_partials + _dense_reduce) instead of cuBLAS.
+- Source SHA256: bf07ffe5d8e38584f72e1955758c30566485b9a2a9c20000ba16aa05e93ae98a
+- Check beb8c44c658f4443 (UTC 2026-11-03 check 3): PASS 13/13 tests, 12
+  shapes, no flags. 1.1367073x (CI 1.1196567-1.1537579), score 19899.845 us.
+- Changed shapes vs attempt 10: -1.0% to +0.4% (no difference); vs attempt 8
+  mean +1.02% as a group. Profile decode-1: split-K o 6.6 us + reduce versus
+  cuBLAS 7.1 us. Unchanged verify-16 shapes -5.8/-6.4% on identical code
+  (paired SGLang time moved, not ours: 426 us vs attempt 8's 429 us).
+- Conclusion: porting bf16_proj's kernels gains decode_layer only ~1-1.5% on
+  the changed shapes, inside noise. Line stopped; submission.py stays attempt 8.
