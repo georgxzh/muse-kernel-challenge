@@ -31,6 +31,11 @@ target = GPUTarget("cuda", 90, 32)
 
 def compile_one(name, signature, constants, **options):
     fn = getattr(module, name)
+    constants = dict(constants)
+    if name == "_attention_parts" and hasattr(module, "ATTENTION_M"):
+        constants["M"] = min(constants["M"], module.ATTENTION_M)
+    if "QGROUPS" in fn.arg_names:
+        constants["QGROUPS"] = triton.cdiv(constants["L"] * (constants["HQ"] // constants["HK"]), constants["M"])
     if name == "_attention_parts" and len(sys.argv) > 2:
         options["num_stages"] = int(sys.argv[2])
     # CUDA allocator tensors passed to the real JIT have 16-byte aligned bases.

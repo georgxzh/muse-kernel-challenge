@@ -1,14 +1,15 @@
 # Attention decode experiments
 
-## Current status (2026-11-02)
+## Current status (evening Nov 2 Toronto; UTC quota cycle 2026-11-03)
 
 - Best scored: **1.38346370x SGLang**, job `a4b548ad9d744089`, PASS 16/16.
 - Current kernel: `submission.py`, byte-identical to `candidates/attempt07_hybrid.py`.
 - 95% speedup CI [1.36271175, 1.40421566]; equivalent score 2722.370 us.
 - Started with a submitted 1.11109588x fused-FA3 entry, improved to a submitted
   1.28034635x custom-sliding entry, then to the current native-FP8/FA3 hybrid.
-- Today: 6/10 checks used (4 left, including 2 reserved), 3/5 scored submissions
-  used (2 left). Ask before every additional submit. No checks/submits pending.
+- New UTC cycle: 5/10 checks used under user cap (5 left, including 2 reserved),
+  0/5 scored submissions used. Four checks pending (attempts 9-12).
+  Prior UTC cycle used 6 checks and 3 scored runs. Ask before every new submit.
 - Current hybrid retains FA3 for batched full verify and uses custom native FP8 QK,
   FP32 online softmax/accumulation and BF16 PV elsewhere. All keys in each context
   or window are included; no value skipping, tensor-derived caching, or host sync.
@@ -207,3 +208,31 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Prepared two independent drafts (not yet measured): attempt09_l2_loads.py uses
   .cg on KV loads; attempt10_dynamic_splits.py fixes total CTA count using H200
   occupancy and computes chunk sizes from live GPU sequence lengths. Both compile.
+
+## Attempts 9-12 — independent follow-ups (pending)
+
+- Attempt 9: `candidates/attempt09_l2_loads.py`, job `c9fb0a3f8f0847d5`.
+  Change only K/V load cache policy to .cg, bypassing L1 for cache rows loaded once
+  by each CTA. Correctly aligned SM90 compilation passes with no attention spills.
+- Attempt 10: `candidates/attempt10_dynamic_splits.py`, job `53ead2c9320442a8`.
+  Fix total CTAs to approximately H200 occupancy (4 decode / 3 verify CTAs per
+  each of 132 SMs), choose per-request chunks from live GPU seqlens, and retain
+  static allocation/grid dimensions. Every required key remains assigned once
+  to a split. No GPU-to-host length reads. Offline compilation passes.
+- Attempt 11: `candidates/attempt11_query_tiles_fp8.py`, job `ac4f2870058c4d84`.
+  Split verify's 64 query rows per KV head into 2 independent 32-row groups;
+  output scratch indices remain global query-row indices, with disjoint writes.
+  Uses passing attempt 8 FP8 PV. Each group still traverses the complete context.
+- Attempt 12: `candidates/attempt12_query_tiles_bf16.py`, job `1fc675802a884460`.
+  Same 32-row query tiling with BF16 PV (more precise, as in current hybrid).
+- Both query-tiling variants compile offline without attention spills. Attention
+  registers estimated at 168 (FP8 PV) / 140 (BF16 PV) for full verify.
+- New UTC cycle usage: 5/10 checks; 5 left with 2 reserved. No scored run approved
+  or made in this cycle. Preserve submission.py at the scored 1.383x candidate.
+
+- Prepared candidates 9-12 are committed as compile-only PASS / GPU queued, to
+  preserve the work during the service queue. Each GPU result will get a separate
+  result commit. No draft is promoted or submitted based on compilation alone.
+- Aligned full-verify BF16-PV resource comparison: current 64-row body uses
+  202 registers/thread; 32-row draft uses 140, potentially raising residency from
+  2 to 3 CTAs/SM. This is an estimate, not a measured speedup.
