@@ -1,0 +1,21 @@
+_expand_nvfp4 2048 4 0 ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_expand_nvfp4' for 'sm_90a'
+ptxas info    : Function properties for _expand_nvfp4
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, used 0 barriers
+ptxas info    : Compile time = 25.228 ms
+
+_expand_pairs 1024 4 0 ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_expand_pairs' for 'sm_90a'
+ptxas info    : Function properties for _expand_pairs
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 0 barriers
+ptxas info    : Compile time = 13.855 ms
+
+_expand_pairs 2048 8 0 ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_expand_pairs' for 'sm_90a'
+ptxas info    : Function properties for _expand_pairs
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 0 barriers
+ptxas info    : Compile time = 12.754 ms
+

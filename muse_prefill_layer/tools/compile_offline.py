@@ -65,3 +65,17 @@ if hasattr(module, "_align_mixed_routes"):
         check("_align_mixed_routes", dict(Ids="*i32", Local="*i32", S16="*i32", E16="*i32", T16="*i32", S32="*i32", E32="*i32", T32="*i32"),
               dict(N=n, START=0, E=32, CUT=16, NP=triton.next_power_of_2(n), NE=32,
                    NB16=triton.next_power_of_2(triton.cdiv(n,16)), NB32=triton.next_power_of_2(triton.cdiv(n,32))), 8)
+
+if hasattr(module, "_align_local_routes"):
+    for n in (2400, 4800, 6024, 8192):
+        check("_align_local_routes", dict(Ids="*i32", Local="*i32", Sorted="*i32", Experts="*i32", Total="*i32"),
+              dict(N=n, START=0, E=32, BM=64, NP=triton.next_power_of_2(n), NE=32,
+                   NB=triton.next_power_of_2(triton.cdiv(n,64))), 8)
+
+if hasattr(module, "_expand_pairs"):
+    check("_expand_pairs", dict(W="*u8", SF="*fp8e4nv", GS="*fp32", OUT="*i32"),
+          dict(NK=8192*4096, BLOCK=1024), 4)
+
+if hasattr(module, "_nvfp4_tiled_mm"):
+    check("_nvfp4_tiled_mm", dict(X="*bf16", W="*u8", SF="*fp8e4nv", GS="*fp32", LAYOUT="*i32", Y="*bf16"),
+          dict(M=135168, N=8192, K=4096, BM=64, BN=128, BK=64, GROUP_M=8), 4)

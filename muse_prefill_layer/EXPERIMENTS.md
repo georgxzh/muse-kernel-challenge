@@ -230,5 +230,49 @@
 - Reason for check: reduce repeated scale conversion, decode/register cost,
   and store instructions in the ~1.44 ms expansion stage.
 - Check a537a0e611a844a7 accepted after one transport-reset retry.
-- Result pending; this is UTC 2026-11-03 check 2. User limits still 10/5,
-  with two checks reserved (at most eight accepted checks per UTC day).
+- This is UTC 2026-11-03 check 2. User limits still 10/5, with two checks
+  reserved (at most eight accepted checks per UTC day).
+- Result: PASS five tests/eight timed shapes, no flags. Speedup 1.146172x
+  (95% interval 1.128979-1.163365), score 337998.0 us. Saved as check_v9.json.
+- Profile: _expand_pairs ~1.06 ms per 16K prefill vs ~1.45 ms for
+  _expand_nvfp4 (-27%); other kernels unchanged.
+- Per-shape paired ratio vs scored attempt 4 (77805d4b2f504d81):
+  16K ctx0 full +1.64%, 16K ctx32768 sliding +2.22%, 16K ctx32768 full
+  +3.17%, 16K ctx65536 full +2.18%. The four changed (long) shapes gain
+  +2.30% by geometric mean (+2.37% vs mean of both attempt 4 runs).
+  Unchanged short shapes -0.40% to +0.07%. Attempt 4's own run-to-run
+  spread is up to 1.6% (16K ctx0) and below 0.8% elsewhere.
+- Verified better under the muse_bf16_proj rule: the changed group gains,
+  worst shape -0.40% (limit -3%), and overall speedup 1.1462 > 1.1394.
+  Recommend promoting to submission.py; scored run needs user approval.
+
+## Attempt 8 re-read under the verified-better rule
+
+- Not verified better. vs scored attempt 4: 16K ctx0 full -3.86% (-3.08% vs
+  attempt 4 mean). The long group with the grouped-GEMM hint is -0.09% overall,
+  so the expected_m hint shows no gain.
+- Short-prefill local alignment (q753 batch 1): +2.68% sliding, +1.34% full,
+  vs attempt 4's run-to-run spread of 0.25-0.36% on those shapes. Batch 4: ~0.
+  This is the part of attempt 8 worth keeping.
+
+## Offline exploration - fused NVFP4 WGMMA GEMM (no remote check)
+
+- Prototype saved as prototypes/fused_nvfp4_mm.py; never submitted or GPU-tested.
+- It packs routes as attempt 4, dequantizes each weight tile inside BF16
+  WGMMA GEMMs with FP32 accumulation, and retains all original expert work.
+- Native WGMMA is generated, but initial 64x128 tiles spill; legal small
+  variants still use 128-255 registers. Paired reshape hit a Triton shared-
+  layout compiler error; a 2D gather compiles but does not fix high pressure.
+- Resource reports saved in tiled_*_resources.txt. Do not promote this
+  prototype without GPU correctness and CUDA-graph timing evidence.
+- No remote quota spent; prioritize the separately checked pipeline and
+  the pending exact paired-expansion experiment.
+
+## Prepared combination (not checked)
+
+- candidate_combined.py combines attempt 8's checked short scheduling and
+  grouped-GEMM hint with attempt 9's exact paired expansion. Neither original
+  candidate nor submitted attempt4.py is modified.
+- Prepared while the paired-decoder GPU job waits. No additional check or
+  scored submission requested for this combination.
+- Source SHA256: 945b89abd1a9c9fd3fd3509468e370c18b925d8641800a252ac3142b5b4a7ffa
