@@ -421,3 +421,29 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   verify-1 10.5; full decode-16 155.7, decode-32 284.4, verify-16 198.6,
   verify-32 382.5 us (1.01-1.35x). The full-attention batched shapes are now
   most of the remaining gap: board leaders are at ~3.0-3.3x overall.
+
+## Attempts 18-20 - deeper software pipelining of the full-layer loop
+
+- Offline finding (tools/inspect_pipeline.py, Triton 3.5.1 TTGIR/SASS): with
+  num_stages=2 the full-layer loop keeps single K/V buffers, waits for all
+  copies at the top (async_wait 0) and reloads the next tile's page indices
+  with a blocking LDG before issuing its K/V gather: two dependent memory
+  latencies per 128-token tile (~3.3 us per tile measured from 284 us at
+  decode-32). num_stages=3/4 prefetch page indices one tile ahead (cp.async to
+  shared), num_stages=5 double-buffers K/V and pages (40 KB smem, 120 regs).
+- attempt18_full_st3.py: attempt 17 with num_stages=3 for full-layer launches
+  (sliding stays 2). SHA256 afa0838388906bad771bebaf4b38dca9ac3ab17fc31dbcd82326b278084743ea.
+  Check ac046e75f11240b2: PASS 16/16, 1.4450093x, score 2606.419 us.
+- attempt19_full_st5.py: num_stages=5 for full-layer launches.
+  SHA256 19e6a3f74bd482e210bf4d9e00115974bcf37877464f307fab84b5b4e9c56b20.
+  Check 4d80f3a60d9a48bd: PASS 16/16, 1.4326389x, score 2628.925 us.
+- attempt20_triton_verify_st5.py: attempt 19 with FA3 retired (batched full
+  verify on the Triton kernel). SHA256 36cc1df369df3ca8c21d3bffca071eca7fc93ef2effd20fdbc973011c2c352fe.
+  Check 8a995d3e3cef406c: PASS 16/16, 1.3146110x, score 2864.954 us.
+- Full decode-32: 283.7 (st3) / 287.6 (st5) us vs 284.4 us; decode-16
+  153.5 / 147.9 us vs 155.7 us (+1.9% / +5.9%); full verify-1 st5 30.0 us vs
+  26.4 us (-12%). Triton full verify-16/32 at st5: 275.1 / 526.6 us vs FA3
+  200 / 385 us. Latency is not the limiter; all three rejected.
+- Next hypothesis (attempts 21/22): the random page=1 gathers read 64-byte half
+  rows per KV-head CTA (two random DRAM accesses per 128-byte row); read whole
+  rows with both KV heads in one CTA.
