@@ -319,3 +319,27 @@
   batch-4 q753 -0.09/+0.14%; 16K shapes -0.28/-0.17/-2.13/-2.04% (code identical
   to attempt 9, so noise). Board row is now this job: rank 672 -> 667 of 827.
   Scored runs used UTC 2026-11-03: 2 of 5. Checks: 3 of 8 usable.
+
+## Attempt 11 - overlap NVFP4 expansion with attention (built; NOT checked)
+
+- Rules review (TASK.md, AGENTS.md, https://openkernelchallenge.dev/llms.txt):
+  no rule restricts CUDA streams; SGLang's baseline itself forks a side stream
+  for the router and joins it (baseline.py:320-330). Rules require all work
+  inside the timed call ("do work outside the timed calls" is removed), and
+  graph capture fails if a forked stream is not rejoined.
+- Based on scored attempt 10. For tokens >= 4096 (shape-only branch), kernel_fn
+  first forks state["expand_stream"] from the current (capturing) stream and
+  launches both _expand_pairs expansions there, so they overlap the QKV GEMM,
+  FA3, O projection, pooler and router. Kernels, launch configs, values and
+  arithmetic are unchanged; only the issue order and stream differ.
+- Joins, all inside kernel_fn: main waits a w13-ready event before grouped GEMM
+  1; main.wait_stream(expand_stream) before grouped GEMM 2 (covers all side
+  work); plus an explicit redundant main.wait_stream(expand_stream) right
+  before return. Eager-mode record_stream mirrors the baseline's pattern.
+- Cost: w13 (2.1 GB) and w2 (1.07 GB) are both live from the start of the
+  call (previously sequential); about 6.5 GB peak at 16K tokens, well within H200.
+- Offline SM90 compile PASS (offline_v11.txt). No local GPU/torch, so graph
+  capture of the fork/join is untested until the check.
+- Risk: the 524K-CTA expansion grid competes with GEMMs/FA3 for SMs and HBM;
+  overlap may be partial. Upper bound ~1.06 ms per long prefill (5-9%).
+- Source SHA256: 8a78e8b91c07acb47b7747656ef041ab36129bc2281798b568b81e672f1a8dba
