@@ -354,3 +354,28 @@ correctness or performance result.
   (paired SGLang time moved, not ours: 426 us vs attempt 8's 429 us).
 - Conclusion: porting bf16_proj's kernels gains decode_layer only ~1-1.5% on
   the changed shapes, inside noise. Line stopped; submission.py stays attempt 8.
+
+## Attempt 12: PDL between the Triton kernels (attention_decode attempt-17 rule)
+
+- File candidate_pdl.py = scored attempt 8 + programmatic dependent launch:
+  _dense_partials (launch_pdl, gdc_wait before the loop, trigger after its
+  stores) -> _dense_reduce (launch_pdl, wait first, trigger only for qkv) ->
+  _qkv_to_cache (launch_pdl, wait first, no trigger: FA3 follows); router side
+  stream _router_partials (trigger after stores) -> _dense_reduce (launch_pdl).
+  Nothing is written before a wait; triggers sit after each CTA's last store.
+  Math unchanged.
+- Offline SM90 (tools/compile_pdl.py, Triton 3.5.1): 59 variants PASS, no
+  spills; SASS ACQBULK before every global load/store, PREEXIT after the last
+  store (offline_pdl.txt).
+- Source SHA256: 81514f75dbbc8d9702edfcc56657a2ff8b802856a620b092ef4d48be80043221
+- Check c61dcc040a5c4dce (UTC 2026-11-03): PASS 13/13 tests, 12 shapes, no
+  flags. 1.1385474x (CI 1.1214691-1.1556256), score 19867.685 us.
+- vs mean of attempt 8's two runs: T<=8 group (decode 1, verify 1; the PDL
+  chains) +0.76%: decode-1 +1.13/+1.26%, verify-1 -0.49/+1.15% (attempt 8's runs
+  differ 1.0-1.5% there). T=16/32 +0.1..+1.2%. T=128/256 (only _qkv_to_cache's
+  launch changed) -2.6..-4.0%, with SGLang's paired time moving (verify-16
+  sliding 522 vs 545 us) and ours level (431 vs 431 us): run noise, as in
+  attempts 10/11.
+- Not verified better (group gain inside noise; overall below scored 1.1437).
+  The layer's launch chain is mostly SGLang/cuBLAS/FA3/Marlin kernels, so only
+  ~5 short Triton-to-Triton edges exist. submission.py stays attempt 8.
