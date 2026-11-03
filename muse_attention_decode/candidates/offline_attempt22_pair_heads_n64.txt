@@ -1,0 +1,3 @@
+PASS _attention_pair {'HQ': 16, 'HK': 2, 'D': 64, 'PAGE': 1, 'PT_STRIDE': 86008, 'SPLITS': 43, 'CHUNK': 2048, 'SCALE': 0.125, 'N': 64} shared 22528 Used 146 registers spills 0 mma_instr 32 ACQBULK@ [5] PREEXIT@ [1161] first_load@ [17] last_store@ [1160]
+PASS _attention_pair {'HQ': 16, 'HK': 2, 'D': 64, 'PAGE': 1, 'PT_STRIDE': 86008, 'SPLITS': 336, 'CHUNK': 256, 'SCALE': 0.125, 'N': 64} shared 22528 Used 146 registers spills 0 mma_instr 32 ACQBULK@ [5] PREEXIT@ [1160] first_load@ [17] last_store@ [1159]
+PASS _attention_pair {'HQ': 16, 'HK': 2, 'D': 64, 'PAGE': 64, 'PT_STRIDE': 86008, 'SPLITS': 43, 'CHUNK': 2048, 'SCALE': 0.125, 'N': 64} shared 22528 Used 147 registers spills 0 mma_instr 32 ACQBULK@ [5] PREEXIT@ [1178] first_load@ [17] last_store@ [1177]
