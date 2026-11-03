@@ -335,3 +335,15 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   full-decode gains over the previous BF16-PV path recur across independent checks.
 - Current UTC-cycle usage: 8/10 checks, two reserved; 0/5 scored submissions.
   Do not run additional checks this cycle. Every submit still needs approval.
+
+## Attempt 14 scored submission — approved and queued
+
+- User explicitly approved one scored submit of exact attempt 14, source commit
+  `9ccaccd`, after reviewing the passing 1.40088781x check result.
+- Verified source SHA256 against that commit:
+  `7f0dbde841d0377d814fc2c958f89103424a6a8bf5bb7b0a25961afd7c0f5899`.
+- Submitted `candidates/attempt14_pv_hybrid.py`; scored job `1f40b617a3c14d74`.
+- Await scored correctness/timing report. Existing best scored is attempt 7
+  at 1.38346370x until this job completes.
+- Current-cycle usage: 8/10 checks (two reserved), 1/5 scored runs. No further
+  scored submission is authorized by this approval.
