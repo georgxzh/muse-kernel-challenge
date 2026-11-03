@@ -249,13 +249,17 @@ def _experts(x, topk_weights, topk_ids, state):
     num_tokens, size_k = x.shape
     size_n = bank["size_n"]
     gemm1_n = 2 * size_n
-    local_ids = bank["expert_map"][topk_ids].contiguous()
     topk_weights = topk_weights.to(torch.float32).contiguous()
     for block_size_m in BLOCK_SIZE_M_CANDIDATES:
         if num_tokens * TOP_K / LOCAL_EXPERTS / block_size_m < 0.9:
             break
     # Alignment only needs the 32 local expert bins; -1 marks nonlocal slots.
-    sorted_ids, block_experts, n_padded = moe_align_block_size(local_ids, block_size_m, LOCAL_EXPERTS)
+    if num_tokens <= 1024:
+        local_ids, sorted_ids, block_experts, n_padded = _align_local(
+            topk_ids, {"local_start": 0, "local_count": LOCAL_EXPERTS}, block_size_m)
+    else:
+        local_ids = bank["expert_map"][topk_ids].contiguous()
+        sorted_ids, block_experts, n_padded = moe_align_block_size(local_ids, block_size_m, LOCAL_EXPERTS)
     cache2 = torch.empty((num_tokens * TOP_K, size_n), device=x.device, dtype=x.dtype)
     cache13 = torch.empty((num_tokens * TOP_K * max(gemm1_n, size_k),), device=x.device, dtype=x.dtype)
     cache1 = cache13[: num_tokens * TOP_K * gemm1_n].view(-1, gemm1_n)
@@ -277,6 +281,56 @@ def _experts(x, topk_weights, topk_ids, state):
         y, topk_weights, norm_weight=state["post_expert_w"], eps=POST_NORM_EPS, weight_first=True,
         slot_expert_ids=local_ids)
 
+
+
+@triton.jit
+def _align_local_routes(Ids, Local, Sorted, Experts, Total,
+                        N: tl.constexpr, START: tl.constexpr,
+                        E: tl.constexpr, BM: tl.constexpr,
+                        NP: tl.constexpr, NE: tl.constexpr, NB: tl.constexpr):
+    # Each local expert owns a disjoint padded segment. The small histogram
+    # supplies identical segment boundaries to all CTAs without global atomics.
+    expert = tl.program_id(0)
+    p = tl.arange(0, NP)
+    ids = tl.load(Ids + p, p < N, other=-1) - START
+    valid = (p < N) & (ids >= 0) & (ids < E)
+    if expert == 0:
+        tl.store(Local + p, tl.where(valid, ids, -1), p < N)
+    own = valid & (ids == expert)
+    count = tl.sum(own.to(tl.int32), 0)
+    if (count > 0) | (expert == 0):
+        hist = tl.histogram(tl.where(valid, ids, 0), NE, mask=valid)
+        padded = tl.cdiv(hist, BM) * BM
+        e = tl.arange(0, NE)
+        base = tl.sum(tl.where(e < expert, padded, 0), 0)
+        if expert == 0:
+            tl.store(Total, tl.sum(padded, 0))
+        n_pad = tl.cdiv(count, BM) * BM
+        # Fill and scatter are separated by a CTA barrier: different warps
+        # may otherwise overwrite a real pair with its padding sentinel.
+        tl.store(Sorted + base + p, N, p < n_pad)
+        tl.debug_barrier()
+        rank = tl.cumsum(own.to(tl.int32), 0) - 1
+        tl.store(Sorted + base + rank, p, own)
+        b = tl.arange(0, NB)
+        tl.store(Experts + base // BM + b, expert, b < n_pad // BM)
+
+def _align_local(ids, cfg, bm):
+    n = ids.numel()
+    count = cfg["local_count"]
+    capacity = min(n * bm, n + count * (bm - 1))
+    local = torch.empty_like(ids)
+    sorted_ids = torch.empty((capacity,), dtype=torch.int32, device=ids.device)
+    experts = torch.empty((triton.cdiv(capacity, bm),), dtype=torch.int32, device=ids.device)
+    total = torch.empty((1,), dtype=torch.int32, device=ids.device)
+    _align_local_routes[(count,)](
+        ids, local, sorted_ids, experts, total,
+        N=n, START=cfg["local_start"], E=count, BM=bm,
+        NP=triton.next_power_of_2(n), NE=triton.next_power_of_2(count),
+        NB=triton.next_power_of_2(triton.cdiv(n, bm)),
+        num_warps=8,
+    )
+    return local, sorted_ids, experts, total
 
 @triton.jit
 def _expand_nvfp4(W, SF, GS, OUT, NK: tl.constexpr, BLOCK: tl.constexpr):
@@ -403,7 +457,6 @@ def _experts_grouped(x, topk_weights, topk_ids, state):
     return out
 
 
-
 @triton.jit
 def _expand_pairs(W, SF, GS, OUT, NK: tl.constexpr, BLOCK: tl.constexpr):
     e = tl.program_id(1)
@@ -442,7 +495,6 @@ def _expand_pairs(W, SF, GS, OUT, NK: tl.constexpr, BLOCK: tl.constexpr):
         constraints="=r,r,f", args=[raw, scale], dtype=tl.int32,
         is_pure=True, pack=1)
     tl.store(OUT + e * (NK // 2) + j, pair, j < NK // 2)
-
 
 @triton.jit
 def _qk_cache(QKV, Q, KC, VC, LOC, POS, CS, KS, VS,

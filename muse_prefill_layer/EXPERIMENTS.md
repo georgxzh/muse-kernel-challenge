@@ -309,3 +309,13 @@
 - Verified better under the rule: changed group gains above noise, worst shape
   -2.11% > -3%, overall 1.1592 > 1.1506. Candidate for a scored run, pending
   user approval. submission.py remains attempt 9.
+- User approved a scored run. Pre-submit: attempt10.py raw SHA256 c335e88d...
+  equals the hash recorded before the check; file unchanged since the check.
+  submission.py = attempt10.py.
+- Scored job 46d3afde6a5a4ce1: PASS five tests/eight timed shapes, no flags.
+  Speedup 1.157120x (95% interval 1.139763-1.174477), score 334800.2 us.
+  Server content_hash 3ef3cc49... equals check 8197e711f8644fb0's.
+- Per shape vs scored attempt 9: batch-1 q753 +2.35%/+1.96% (gain reproduced);
+  batch-4 q753 -0.09/+0.14%; 16K shapes -0.28/-0.17/-2.13/-2.04% (code identical
+  to attempt 9, so noise). Board row is now this job: rank 672 -> 667 of 827.
+  Scored runs used UTC 2026-11-03: 2 of 5. Checks: 3 of 8 usable.
