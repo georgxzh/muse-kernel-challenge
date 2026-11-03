@@ -1,10 +1,11 @@
 # okc: problem=muse_bf16_proj
-"""Split-K tensor-core projections, with a fused hi/lo router."""
+"""Split-K tensor-core projections, with a fused hi/lo router; PDL into the router's second pass."""
 from typing import TypedDict
 
 import torch
 import triton
 import triton.language as tl
+from triton.language.extra.cuda import gdc_launch_dependents, gdc_wait
 
 
 _TILE = 64  # weight tile; every tiled layer's N and K are multiples
@@ -89,6 +90,8 @@ def _split_mm(X, W, L, P, Y, CNT, M: tl.constexpr, N: tl.constexpr,
                        offs, mask, acc, M * N, SPLIT)
     else:
         tl.store(P + si * M * N + offs, acc, mask)
+        # PDL: let _finish launch once every CTA has stored its partial.
+        gdc_launch_dependents()
 
 
 @triton.jit
@@ -123,6 +126,8 @@ def _finish(P, Y, SIZE: tl.constexpr, SPLIT: tl.constexpr,
             BLOCK: tl.constexpr):
     i = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
     s = tl.arange(0, SPLIT)
+    # PDL-launched: block until _split_mm has completed and its partials are visible.
+    gdc_wait()
     v = tl.load(P + s[:, None] * SIZE + i[None, :], i[None, :] < SIZE, 0)
     tl.store(Y + i, tl.sum(v, axis=0), i < SIZE)
 
@@ -168,6 +173,8 @@ def prepare(weights: Weights):
 def _join_router(P, Y, SIZE: tl.constexpr, N: tl.constexpr, BLOCK: tl.constexpr):
     i = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
     pos = (i // N) * (2 * N) + i % N
+    # PDL-launched after cuBLAS: block until the GEMM has completed.
+    gdc_wait()
     hi = tl.load(P + pos, i < SIZE, 0)
     lo = tl.load(P + pos + N, i < SIZE, 0)
     tl.store(Y + i, hi + lo, i < SIZE)
@@ -179,7 +186,7 @@ def kernel_fn(data: Inputs, state) -> torch.Tensor:
     if router and m > 32:
         products = torch.mm(x, state["router_pair"], out_dtype=torch.float32)
         out = torch.empty((m, n), device=x.device, dtype=torch.float32)
-        _join_router[(triton.cdiv(m * n, 256),)](products, out, m * n, n, 256)
+        _join_router[(triton.cdiv(m * n, 256),)](products, out, m * n, n, 256, launch_pdl=True)
         return out
     tiled = (layer in ("qkv_gate", "pooler") and m <= 16) or (layer == "unpooler" and m <= 8)
     if layer in ("pooler", "unpooler") and m > 32:
@@ -216,5 +223,5 @@ def kernel_fn(data: Inputs, state) -> torch.Tensor:
             num_warps=8 if bm == 128 else 4, num_stages=3)
     assert grid[0] * grid[1] <= _COUNTERS
     if not serial:
-        _finish[(triton.cdiv(m * n, 256),)](partial, out, m * n, split, 256)
+        _finish[(triton.cdiv(m * n, 256),)](partial, out, m * n, split, 256, launch_pdl=True)
     return out

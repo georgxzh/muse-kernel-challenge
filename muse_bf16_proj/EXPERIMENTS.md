@@ -295,3 +295,13 @@ Changed shapes count as one group. A candidate is verified better when the group
 - Status: changed shapes verified faster (+6.5%, well above noise); overall
   criterion not met on this run's slower machine. Expected board effect about
   +0.6% (3 of 30 shapes). Scored run pending user decision.
+
+### Attempt 15 scored
+
+- User approved. submission.py = attempts/attempt15_pdl_router.py (SHA256
+  82505261..., unchanged since check e76469ef9968411f; server content_hash
+  a2f174e9bf5025c8... identical for check and scored run).
+- Scored run ae15f0330a304a41 (UTC 2026-11-03 23:44): PASS 9/9 tests,
+  1.1735568x (CI 1.1559534-1.1911601), score 4116.375 us. Board row now this
+  run: 1.174x, rank 1227 (was 1246 at 1.170x). Result in
+  attempts/submit_15.json, profiles/submission.ae15f0330a304a41.*.
