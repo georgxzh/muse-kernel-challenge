@@ -1,0 +1,8 @@
+Triton 3.5.1
+o m 1 SPLIT 4 :     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 44 registers, used 1 barriers
+o m 8 SPLIT 4 :     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 44 registers, used 1 barriers
+o m 16 SPLIT 4 :     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 44 registers, used 1 barriers
+unpooler m 1 SPLIT 16 :     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 52 registers, used 1 barriers
+unpooler m 5 SPLIT 16 :     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 52 registers, used 1 barriers
+qkv_gate m 1 SPLIT 8 :     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 48 registers, used 1 barriers
+pooler m 7 SPLIT 8 :     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 48 registers, used 1 barriers

@@ -255,3 +255,18 @@ Changed shapes count as one group. A candidate is verified better when the group
 - More splits help only the layer with few output tiles (unpooler: 128 CTAs at
   split 8); for the big layers the extra partial traffic and longer last-CTA
   reduction cost more than the added parallelism. Rejected.
+
+## Attempt 14 - tiled single-kernel o (m<=16) + 16-split unpooler (rejected)
+
+- attempts/attempt14_o_tiled.py = scored attempt 12 + o at m<=16 on the tiled
+  single-kernel path (exact 64x64 tiles of o in prepare, split 4, 512 CTAs) +
+  unpooler m<=8 at split 16; qkv_gate/pooler back to split 8. No spills.
+- Check 9e3e0a68752b4036 (UTC 2026-11-03 check 7): PASS 9/9, 30/30 shapes, no
+  flags, 1.1648252x (CI 1.1473529-1.1822976), below scored 1.1701x.
+- vs mean of attempt 12's runs: o m=1/8/16 -6.5/-14.1/-17.5% (cuBLAS is better
+  for o), unpooler m=1/8 +7.2/+0.7% (attempt 13: +3.3/+3.7%).
+- Rejected. The 16-split unpooler is a consistent but tiny gain (two shapes,
+  about +0.15% on the board, inside run-to-run noise); not worth a scored run.
+- Status of the three follow-up ideas (UTC 2026-11-03): decode_layer port
+  ~+1-1.5% on changed shapes (noise); o projection: cuBLAS wins; more K-splits:
+  only unpooler benefits. bf16_proj stays at scored attempt 12 (1.1701x).
