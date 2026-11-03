@@ -255,3 +255,19 @@ Work is confined to this problem on `master`. Other chats share the repository.
   bs=1 (N=8), a padded segment of 16 slots had only 8 filled with the sentinel;
   the other 8 kept stale row indices from earlier calls, so other routes'
   rows were overwritten under graph replay. Previous paths used BM<=N.
+- Fix (attempt 10): NP = next_pow2(max(N, BM)) in _align_local, so a padded
+  BM tile is always fully sentinel-filled. Offline compile PASS for bs 1-32.
+
+## Attempt 10 - attempt 9 + alignment fix (correct, 3x slower than Marlin)
+
+- Check 6ba4f5ce11d14e23 (UTC 2026-11-03 check 2): PASS 5/5 tests and all 6
+  timed shapes (rel L2 ~0.0055, same as Marlin), no flags, but speedup
+  0.575785x (CI 0.567148-0.584422), score 23356.8 us.
+- Skinny shapes vs SGLang: M1 0.353x (220 us vs Marlin 50), M16 0.384x
+  (510 us), M32 0.325x (633 us), M8 0.368x (410 us). M128/M256 (Marlin)
+  1.456x/1.541x, unchanged.
+- Profile: _nvfp4_moe_mm is ~98% of each skinny shape (decode-1: 204 us for
+  two GEMMs, about 0.27 TB/s). Each CTA waits on every weight load before
+  decoding (no pipelining), and ~1024 CTAs run in two waves at 4 CTAs/SM;
+  the per-byte decode (~20 instructions) is also heavy versus Marlin's
+  bit-trick dequant.
