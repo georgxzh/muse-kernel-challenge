@@ -284,3 +284,32 @@ correctness or performance result.
   be used while retaining the reserve) and 4 further scored entries with approval.
 - No new check or scored run was launched after this final approved submission.
 - Only muse_decode_layer files were edited/staged; master retained throughout.
+
+## Session handoff and budget (UTC 2026-11-03)
+
+- This board is now worked from the prefill session (Codex stopped). The user
+  dropped the 2-check reserve because the kernel boards close 07:59 UTC Nov 5.
+  Cap stays 10 checks / 5 scored per UTC day; ask before every scored run.
+- Board at handoff: scored 1.1437x (daa4848cafe04e93, attempt 8), rank 1150/1234.
+
+## Attempt 9: local-only route alignment (candidate_align_local.py)
+
+- Based on scored attempt 8 (submission.py). Only change: replace
+  moe_align_block_size(local_ids, bm, 256) with _align_local_routes, ported
+  verbatim from muse_prefill_layer attempt 10 (checked there; originally from
+  muse_moe_w4a16 attempt 6). It aligns the 32 local experts only; nonlocal
+  (-1) routes get no padded Marlin blocks. Every local route, weight and
+  precision is unchanged; same route tiles M=8/16/32.
+- Offline SM90 compile (tools/compile_align_offline.py, Triton 3.5.1) PASS
+  for T=1,2,8,16,17,32,64,128,129,256 (offline_align_local.txt).
+- Source SHA256: 3c5c140fb8937550b32096cd783a9be94066d451bcbd714715cd6ebd67db7618
+- Check 182f48356e8448fe (UTC 2026-11-03 check 1): PASS 13/13 tests, 12 timed
+  shapes, no flags. Speedup 1.1505725x; 95% CI [1.1333139, 1.1678310];
+  score 19660.0395 us. content_hash 6aca48e6...
+- All 12 shapes changed. vs scored attempt 8: geo +0.56%; vs mean of attempt
+  8's two runs (same code, 1.1437x/1.1514x): +0.22%. Per shape vs mean: decode
+  32 sliding +3.36%, decode 16 sliding +1.49%, verify 16 sliding/full
+  -1.58/-1.97%, others -1.2..+1.1%. Attempt 8 run-to-run is up to 1.5%.
+- Profile Marlin time: verify 32 446-449 -> 395-410 us, but single-shot
+  profiles also show increases elsewhere; timed medians do not confirm a gain.
+- NOT verified better (group gain inside noise). submission.py stays attempt 8.
