@@ -263,3 +263,9 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Job `53ead2c9320442a8`: PASS 16/16, 1.15726522x, 95% CI [1.13990625, 1.17462420], score 3254.483 us.
 - Occupancy-sized dynamic splitting was slower, especially full decode (213/422 us at B16/32). Fixed 2048-token splits remain preferable.
 - submission.py remains byte-identical to scored attempt 7 (1.38346370x).
+
+## Attempt 11 GPU result
+
+- Job `ac4f2870058c4d84`: PASS 16/16, 1.11308153x, 95% CI [1.09638531, 1.13354513], score 3383.669 us.
+- 32-row FP8 query tiling repeats cache traffic and slows batched verify substantially; reject promotion.
+- submission.py remains byte-identical to scored attempt 7 (1.38346370x).
