@@ -586,4 +586,17 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   smem. Lane-level numpy emulation of every fragment/permutation
   (tools/emulate_full_decode.py) matches direct attention to 1e-15 over full and
   partial tiles, page 1 and 64, and an empty split.
-- Check f004af3159cf4dc7 pending.
+- Check f004af3159cf4dc7 (UTC 2026-11-04): PASS 16/16, 1.3260629x. The kernel is
+  correct on hardware (fragment layouts as emulated) but latency-bound: full
+  decode-1/16/32 kernel 33.0/172.6/298.8 us (shapes 40.4/178.3/283.2 us vs
+  18.8/155.7/284.4). Each warp looks up the page table, then loads, then waits, with
+  233 registers (2 CTAs x 4 warps per SM). Rejected as is.
+
+## Attempt 35 - CUDA kernel v2: cp.async double-buffered whole-row staging
+
+- candidates/cuda/attn_full_decode_v2.cu in candidates/attempt35_cuda_full_decode_v2.py:
+  same fragment math as attempt 34; each warp stages its 32-token tiles' whole K/V rows
+  into shared memory with cp.async (2 stages, 64 KB per CTA, page-table entries looked
+  up one tile further ahead), fragments read from XOR-swizzled shared memory, buffers
+  reused for the merge. 168 registers (48 B spill): 3 CTAs x 4 warps per SM.
+  SHA256 e2060334e99b4b92... Check 198506e74d4c4846 pending.
