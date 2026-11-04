@@ -423,3 +423,16 @@ correctness or performance result.
   a seed-dependent near-tie (scores within ROUTE_TOL; the distinct-local slack
   15% + 2 is strict at 8 tokens). Attempt 13 passed every recheck in two runs.
   Timing was not measured; re-measure with a comment-only copy.
+
+## Attempt 15: attempt 13 + BF16 split-K partials (rules 2026-11-03)
+
+- candidate_bf16_partials.py: T<=8 Triton GEMM partials stored in BF16,
+  summed in FP32 by _dense_reduce; router partials FP32.
+  SHA256 52ff0c9772fac9a262a08a14383a7ee1793a2c1e3fac8d007cc7e939f9cd69f1.
+- Check c26b3dca04f144f8: PASS, 1.1810402x (scored attempt 13: 1.1813x).
+  T<=8 shapes +0.24% vs attempt 13's two runs (noise). Rejected.
+- Attempt 14's failed run still timed shapes 0-6: decode-1 sliding/full
+  +19.2/+17.8%, decode-16 +16.9/+9.6%, verify-1 sliding +16.0%, decode-32
+  -0.6/-0.7% vs attempt 13: SGLang's post-expert-norm wrapper was the ~25 us of
+  PyTorch reduce/elementwise kernels. Re-measured as candidate_postnorm_b.py
+  (comment-only copy), check 7f2f5696daac4d16.
