@@ -540,3 +540,18 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   sliding verify-1/16/32 +6.1/+4.0/+1.6%, but sliding decode-1 -3.4% and
   decode-32 -12.0%. Fails the -3% rule as is; a verify-only (L > 1) variant
   could keep the gains (~+0.5% on the board).
+
+## Attempts 29, 31, 32 - whole-row L2 fetches by prefetch hints
+
+- Goal (diagnostic 01): make DRAM fetch whole 128-byte K/V rows while each
+  KV-head CTA keeps reading its 64-byte half. All three add a hint before the
+  tile's cp.async loads on full layers only; arithmetic unchanged.
+- attempt29_l2_row_prefetch.py: cp.async.bulk.prefetch.L2 [row], 128 (ptxas
+  wraps the uniform-operand UBLKPF in a 32-lane loop). Check 58da097254be449d:
+  1.2874937x; full decode-1/16/32 23.7/208.9/386.4 us (-20/-25/-27%).
+- attempt31_l2_prefetch_line.py: per-thread prefetch.global.L2 (CCTL.E.PF2).
+  Check 00ed58d6b8e143c3: 1.3824081x; 19.5/160.8/356.9 us (-3/-3/-21%).
+- attempt32_l2_128b_touch.py: ld.global.L2::128B (LDG.E.LTC128B), result kept
+  in a never-stored sink. Check 2ba60b87975a4a12: 1.3624453x; 21.7/175.0/346.5 us.
+- All slower: the extra fetch requests cost more than whole-line DRAM fetches
+  save. Rejected. Attempt 33 (FP16 P.V for sliding verify only) is checking.

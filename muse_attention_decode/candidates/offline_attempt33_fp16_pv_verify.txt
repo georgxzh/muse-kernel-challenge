@@ -1,0 +1,57 @@
+_prepare {'HQ': 16, 'HK': 2, 'D': 64, 'STRIDE': 2304, 'THETA': 0.0, 'TOKENS': 256, 'BLOCK': 4} shared 0
+ptxas info    : 11 bytes gmem
+ptxas info    : Compiling entry function '_prepare' for 'sm_90a'
+ptxas info    : Function properties for _prepare
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers, used 0 barriers
+ptxas info    : Compile time = 52.749 ms
+
+_prepare {'HQ': 16, 'HK': 2, 'D': 64, 'STRIDE': 2304, 'THETA': 500000.0, 'TOKENS': 256, 'BLOCK': 4} shared 1024
+ptxas info    : 35 bytes gmem
+ptxas info    : Compiling entry function '_prepare' for 'sm_90a'
+ptxas info    : Function properties for _prepare
+    32 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 32 bytes cumulative stack size
+ptxas info    : Compile time = 44.134 ms
+
+_attention_parts {'HQ': 16, 'HK': 2, 'D': 64, 'L': 1, 'PAGE': 1, 'PT_STRIDE': 86008, 'SPLITS': 42, 'CHUNK': 2048, 'WINDOW': 0, 'SCALE': 0.6841258107984375, 'M': 16, 'N': 128} shared 22528
+ptxas info    : 11 bytes gmem
+ptxas info    : Compiling entry function '_attention_parts' for 'sm_90a'
+ptxas info    : Function properties for _attention_parts
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 120 registers, used 1 barriers
+ptxas info    : Compile time = 48.708 ms
+
+_attention_parts {'HQ': 16, 'HK': 2, 'D': 64, 'L': 8, 'PAGE': 64, 'PT_STRIDE': 86008, 'SPLITS': 42, 'CHUNK': 2048, 'WINDOW': 0, 'SCALE': 0.6841258107984375, 'M': 64, 'N': 128} shared 28672
+ptxas info    : 11 bytes gmem
+ptxas info    : Compiling entry function '_attention_parts' for 'sm_90a'
+ptxas info    : Function properties for _attention_parts
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 168 registers, used 1 barriers
+ptxas info    : Compile time = 80.154 ms
+
+_combine_gate {'HQ': 16, 'HK': 2, 'D': 64, 'L': 1, 'STRIDE': 2304, 'SPLITS': 42, 'S': 64} shared 1024
+ptxas info    : 11 bytes gmem
+ptxas info    : Compiling entry function '_combine_gate' for 'sm_90a'
+ptxas info    : Function properties for _combine_gate
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 34 registers, used 1 barriers
+ptxas info    : Compile time = 11.994 ms
+
+_combine_gate {'HQ': 16, 'HK': 2, 'D': 64, 'L': 8, 'STRIDE': 2304, 'SPLITS': 513, 'S': 1024} shared 4096
+ptxas info    : 11 bytes gmem
+ptxas info    : Compiling entry function '_combine_gate' for 'sm_90a'
+ptxas info    : Function properties for _combine_gate
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 172 registers, used 1 barriers
+ptxas info    : Compile time = 28.535 ms
+
+_attention_parts {'HQ': 16, 'HK': 2, 'D': 64, 'L': 8, 'PAGE': 1, 'PT_STRIDE': 86008, 'SPLITS': 17, 'CHUNK': 128, 'WINDOW': 2048, 'SCALE': 0.6841258107984375, 'M': 64, 'N': 128} shared 45056
+ptxas info    : (C7514) Potential Performance Loss: wgmma.mma_async instructions are serialized due to non wgmma instructions reading accumulator registers of  a wgmma between start and end of the pipeline stage in the function '_attention_parts'
+ptxas info    : 11 bytes gmem
+ptxas info    : Compiling entry function '_attention_parts' for 'sm_90a'
+ptxas info    : Function properties for _attention_parts
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 226 registers, used 1 barriers
+ptxas info    : Compile time = 91.840 ms
+
