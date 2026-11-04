@@ -393,3 +393,17 @@
   exact decode saves ~35% of decode instructions. Even together, that lands
   at roughly parity before counting Triton's GEMM gap to DeepGEMM.
 - Decision: stop the fusion line. submission.py stays attempt 10 (scored 1.1571x).
+
+## Cross-board review (UTC 2026-11-04): attention port and new precision rules
+
+- muse_attention_decode's kernels (scored 1.4425x there, ported into
+  muse_decode_layer as its attempt 13) do not apply here: they are built for 1
+  or 8 query tokens per sequence (8 or 64 query rows per CTA), while prefill
+  attends 753 to 16,384 query tokens per sequence. FA3's prefill path with FP8
+  queries and the FP8 cache stays.
+- New precision allowances (2026-11-03 rules): FA3 already runs FP8 Q/P here;
+  BF16 split-K partials do not apply (the GEMMs are cuBLAS/DeepGEMM/Marlin);
+  remaining small kernels (layer norm, alignment) are under 1% of the time.
+  Marlin is 64-66% of the turn-1/turn-4 shapes; the grouped DeepGEMM path's
+  fixed ~1,063 us NVFP4->BF16 expansion keeps it slower than Marlin below
+  ~3,000 tokens. No change made.
