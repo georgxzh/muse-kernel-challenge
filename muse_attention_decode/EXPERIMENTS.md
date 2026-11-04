@@ -643,3 +643,19 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Lane-level emulation (tools/emulate_full_verify.py) matches direct causal attention
   to 2e-15 over page 1/64, partial tiles, an empty split and a split holding only the
   block's own tokens. Check 536cc9c650bd4e41 pending.
+
+## Attempts 38-40 results
+
+- Attempt 38 check 536cc9c650bd4e41: PASS 16/16, 1.3646645x. Verify kernel correct on
+  hardware but slower than FA3: full verify-16/32 331.7/628.1 us vs 198.6/382.5 us
+  (-39/-38%); full decode-16/32 +31.5/+32.0% (same decode kernel as attempt 37).
+- Attempt 39 (attempt 37 re-measured, comment-only copy, SHA256 42d97020e63fa40f...)
+  check 5e6de4aaeb4f4737: PASS 16/16, 1.5414912x (content_hash 3cb1d128d24d611c).
+  Full decode-16/32 +28.2/+28.1%; decode-1 sliding -4.2% again (8.4 us; attempt 17's
+  runs 8.2/8.4 us; the paired SGLang time moved: across attempts 34-40 that shape's
+  ratio vs attempt 17's mean ran +0.7, -4.2, +0.3, -4.2, -2.9, -1.6, -3.0%, so attempt
+  17's two runs sit high). Every other shape within -1.2..+3.3%.
+- Attempt 40 (verify v2: 4-stage cp.async ring, one barrier per tile; SHA256
+  aa0cfed7ad4a7936...) check 84548bb9139f4ea0: PASS 16/16, 1.3533238x. Full
+  verify-16/32 324.4/610.9 us: deeper pipelining barely helps; the verify kernel is
+  bound by its per-warp softmax/MMA chain (128 query rows per token). Rejected.

@@ -506,3 +506,16 @@ correctness or performance result.
   +14.2% (505 -> 432 us); unchanged shapes -0.1% (worst verify-16 sliding -1.8%).
   Passes the verified-better rule (overall 1.3230 > scored 1.3023): scored run
   submitted under the user's overnight standing rule (SUBMISSION_LOG.md).
+
+### Attempt 20 scored
+
+- Scored run 444f66ab63174de2 (UTC 2026-11-04 06:50, autonomous under the user's
+  overnight rule; logged in SUBMISSION_LOG.md): PASS, every test and recheck,
+  1.3266114x, score 17051.188 us; server content_hash 67184bed0c55de5a equals the
+  check's. Board 1.327x, rank 974.
+
+## Attempt 21: attempt 20 + the CUDA full-layer verify kernel (B >= 8)
+
+- candidate_cuda_full_verify.py. SHA256 62f135140887e1ab...
+- Check 1b2018de8794495b: PASS, 1.2995845x. Full verify-16/32 -16.3/-20.8% (the
+  verify kernel is slower than FA3; see attention attempts 38/40). Rejected.
