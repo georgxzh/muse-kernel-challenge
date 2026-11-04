@@ -1,0 +1,9 @@
+PASS {'L': 1, 'WINDOW': 2048, 'PAGE': 1, 'CHUNK': 128, 'M': 16} shared 22528 Used 128 registers spills 0 bar 25
+PASS {'L': 1, 'WINDOW': 2048, 'PAGE': 1, 'CHUNK': 256, 'M': 16} shared 22528 Used 128 registers spills 0 bar 25
+PASS {'L': 8, 'WINDOW': 2048, 'PAGE': 1, 'CHUNK': 128, 'M': 64} shared 45056 Used 254 registers spills 0 bar 3
+PASS {'L': 8, 'WINDOW': 2048, 'PAGE': 64, 'CHUNK': 256, 'M': 64} shared 45056 Used 254 registers spills 0 bar 3
+PASS {'L': 1, 'WINDOW': 0, 'PAGE': 1, 'CHUNK': 2048, 'M': 16} shared 22528 Used 120 registers spills 0 bar 20
+PASS {'L': 1, 'WINDOW': 0, 'PAGE': 1, 'CHUNK': 256, 'M': 16} shared 22528 Used 120 registers spills 0 bar 20
+PASS {'L': 8, 'WINDOW': 0, 'PAGE': 1, 'CHUNK': 256, 'M': 64} shared 28672 Used 168 registers spills 0 bar 12
+PASS {'L': 8, 'WINDOW': 0, 'PAGE': 64, 'CHUNK': 2048, 'M': 64} shared 28672 Used 174 registers spills 0 bar 12
+FAILURES: 0
