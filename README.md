@@ -1,43 +1,77 @@
 # Muse Spark Open Kernel Challenge
 
-My entries for the [Open Kernel Challenge](https://openkernelchallenge.dev/). The challenge is to write GPU kernels that run parts of **Muse Spark Open** faster than SGLang, the inference engine they're timed against. The model is served on 8×H200 with tensor parallelism 8 (TP8) and expert parallelism 8 (EP8).
+My entries for the [Open Kernel Challenge](https://openkernelchallenge.dev): GPU kernels that run parts of Muse Spark Open faster than SGLang, the inference engine they're timed against. The model is served on 8×H200 with tensor parallelism 8 (TP8) and expert parallelism 8 (EP8).
 
-Each problem is scored on an H200 as a speedup over SGLang. Every run must first pass correctness tests against an FP32/FP64 reference. Timing replays CUDA graphs with a cold L2 cache, alternating between my kernel and SGLang's on the same fresh inputs.
+## Results
+
+Final scored runs, as a speedup over SGLang on an H200 (higher is better):
+
+| Problem | Speedup | Rank | What made the difference |
+|---|---|---|---|
+| muse_attention_decode | **1.44×** | 969 | Custom paged-FP8 attention, PDL launch overlap |
+| muse_moe_w4a16 | **1.36×** | 1037 | Local route alignment, fused post-norm |
+| muse_decode_layer | **1.30×** | — | Reused the attention_decode kernel inside the full layer |
+| muse_bf16_proj | **1.17×** | 1227 | Single-kernel split-K router, BF16 partial sums |
+| muse_prefill_layer | **1.16×** | 686 | Paired FP4 weight decode, short-prefill scheduling |
+
+Every scored run passed all correctness tests against an FP32/FP64 reference, with no flags.
 
 ## Problems
 
 | Folder | What it computes | Key ideas |
 |---|---|---|
-| [`muse_bf16_proj`](muse_bf16_proj/) | The dense projections: `out = x @ W.T` for the qkv_gate, o, pooler, unpooler and router layers | BF16 GEMM, memory-bound skinny matmuls, split-K, router FP32 via BF16 hi+lo |
-| [`muse_attention_decode`](muse_attention_decode/) | One decode step (or an 8-token verify block) of gated grouped-query attention over a paged FP8 KV cache | QK-norm, RoPE, 2,048-token sliding window or full ~80K context, FA3 |
-| [`muse_moe_w4a16`](muse_moe_w4a16/) | Routed experts: each token's top 8 of 256 experts, 32 of them local to this GPU, SwiGLU with NVFP4 weights | 4-bit weights with BF16 activations, Marlin kernels, fused post-norm |
-| [`muse_decode_layer`](muse_decode_layer/) | A whole decoder layer at decode shapes: projections, attention, router, experts, norms and residuals | Kernel fusion across the full layer |
-| [`muse_prefill_layer`](muse_prefill_layer/) | The same layer at prefill shapes: 753 new tokens on an 80K context, and 16K-token first-turn chunks | Large grouped NVFP4 GEMM, compute-bound attention |
+| muse_bf16_proj | Dense projections: out = x @ W.T for the qkv_gate, o, pooler, unpooler and router layers | Memory-bound skinny GEMMs, split-K, router FP32 via BF16 hi+lo |
+| muse_attention_decode | One decode step (or an 8-token verify block) of gated GQA over a paged FP8 KV cache | QK-norm, RoPE, 2,048-token sliding window or ~80K full context |
+| muse_moe_w4a16 | Routed experts: top 8 of 256 per token, 32 local per GPU, SwiGLU with NVFP4 weights | 4-bit weights, BF16 activations, Marlin |
+| muse_decode_layer | A whole decoder layer at decode shapes | Fusion across projections, attention, router, experts, norms |
+| muse_prefill_layer | The same layer at prefill shapes: 753 tokens on 80K context, and 16K-token chunks | Grouped NVFP4 GEMM, compute-bound attention |
 
-Each folder contains:
+## What worked
 
-- `TASK.md`: the problem statement, shapes, correctness bounds and timing rules
-- `submission.py`: my kernel. `kernel_fn` is the timed call, and `prepare` does untimed weight repacking
-- `baseline.py`: SGLang's implementation, which is what I'm timed against
-- `reference.py` / `checks.py`: the reference computation and correctness checks
-- `EXPERIMENTS.md`: a log of each attempt, what changed, and the result
+- **Removing launch overhead with PDL.** On small decode shapes, 15–30% of runtime was gaps between kernels. Programmatic dependent launch, signalled *after* the producer's writes, gave +4% on the changed shapes.
+- **Reusing kernels across problems.** The attention_decode kernel dropped into decode_layer in place of FA3: +19.5% on full decode-32 and about +10% on the board overall.
+- **One kernel instead of two.** The router's split-K partial pass plus finish kernel was launch-bound at m ≤ 32; fusing them gave +5–8% per shape.
+- **BF16 partial sums** (allowed by the November rule update): half the split-K traffic.
+- **Exact paired FP4 decode**: two values per packed byte, 32 instead of 56 registers, no spills.
+
+## What didn't
+
+- **Fused dequant + grouped GEMM (prefill):** correct but 1.8× slower than expand-then-DeepGEMM; each weight is decoded 5–6 times, once per row tile.
+- **Custom W4A16 MoE GEMM:** about 3× slower than Marlin at 1 token; byte-wise loads cost about 20 instructions per weight.
+- **Second-stream weight expansion, L2 prefetch hints:** within noise.
+
+## How results were verified
+
+- **A candidate counts as better** only if the changed shapes gain as a group beyond run-to-run noise (about 3%), no shape regresses by more than 3%, and the overall speedup is higher.
+- **The content hash of every scored submission is checked** against the passing check run before submitting.
+- **Kernels are compiled offline** with the judge's Triton 3.5.1 (and checked for register spills) before spending a GPU check.
+
+## Repository layout
+
+Each problem folder contains:
+
+- `TASK.md`: problem statement, shapes, correctness bounds and timing rules
+- `submission.py`: the scored kernel. `kernel_fn` is the timed call; `prepare` does untimed weight repacking
+- `attempts/`, `candidates/`: every attempt, checked or not
+- `baseline.py`: SGLang's implementation, the timing baseline
+- `reference.py`, `checks.py`: reference computation and correctness checks
+- `EXPERIMENTS.md`: a log of each attempt, what changed and the result
 - `profiles/`: per-run profiles returned by `okc`
 
 ## Rules that shape the code
 
-- **CUDA graphs:** `kernel_fn` must be capturable. That means no `.item()`, `.cpu()` or syncs, and no allocation or branching that depends on input values. Branching on shapes and config is fine.
-- **Precision:** weights stay at their own precision (BF16 stays BF16, NVFP4 stays NVFP4), though they can be repacked losslessly. Activations stay BF16 wherever SGLang keeps BF16. The KV cache stays FP8 E4M3.
-- **No shortcuts:** attention reads every key, with no sparse or top-k attention. Nothing derived from the inputs may be cached between calls.
-- Full rules: https://openkernelchallenge.dev/rules
+- **CUDA graphs:** `kernel_fn` must be capturable, so no `.item()`, `.cpu()` or syncs, and no allocation or branching on input values. Branching on shapes and config is fine.
+- **Precision:** weights keep their precision (BF16 stays BF16, NVFP4 stays NVFP4) but can be repacked losslessly. Activations stay BF16 wherever SGLang keeps BF16, and the KV cache stays FP8 E4M3. Since November 3, BF16/FP16 partial sums, FP16 attention accumulation and FP8 Q/P are allowed.
+- **No shortcuts:** attention reads every key, and nothing derived from the inputs is cached between calls.
+
+Full rules: https://openkernelchallenge.dev/rules
 
 ## Usage
 
-```bash
-okc check submission.py     # tests + timing, kept off the leaderboard
-okc submit submission.py    # scored run
-okc leaderboard <problem>   # standings
-```
+    okc check submission.py     # tests + timing, kept off the leaderboard
+    okc submit submission.py    # scored run
+    okc leaderboard <problem>   # standings
 
 ## Notes
 
-The code is written with AI coding agents, which the challenge rules allow. Entries are licensed Apache-2.0, as the challenge requires.
+Written with AI coding agents (OpenAI Codex, then Claude Code), as the challenge rules allow. Entries are licensed Apache-2.0, as the challenge requires.
