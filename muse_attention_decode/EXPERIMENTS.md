@@ -555,3 +555,15 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   in a never-stored sink. Check 2ba60b87975a4a12: 1.3624453x; 21.7/175.0/346.5 us.
 - All slower: the extra fetch requests cost more than whole-line DRAM fetches
   save. Rejected. Attempt 33 (FP16 P.V for sliding verify only) is checking.
+
+## Attempt 33 - FP16 P.V for sliding verify blocks only
+
+- candidates/attempt33_fp16_pv_verify.py = attempt 17 with attempt 28's FP16
+  sliding P.V (FP16 operands and per-tile FP16 accumulation, FP32 running sum)
+  only when L > 1; decode keeps BF16 P.V. SHA256 9d557d1be0c72fcc...
+  Offline PASS, no spills.
+- Check d0a2dfbad02b4b20: PASS 16/16, 1.4449039x, score 2606.609 us.
+- vs attempt 17's two runs: sliding verify-1/16/32 +3.2/+1.7/+1.6% (+2.2% as a
+  group); unchanged shapes -0.8% (worst decode-16 sliding -2.9%, identical
+  code). Overall 1.4449 > scored 1.4425. Marginal (expected board gain ~0.2-0.3%,
+  about the noise on these small shapes).
