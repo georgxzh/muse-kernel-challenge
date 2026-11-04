@@ -610,4 +610,14 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   v2 with 8 lanes per row in each copy (lane l copies chunk l % 8 of tile row l / 8 + 4i;
   the row index is shuffled from the lane that looked it up), so each cp.async
   instruction moves 4 whole 128-byte rows. 168 registers (56 B spill).
-  SHA256 a6564a5ff373ab6b... Check 0f841d54ac6a44b4 pending.
+  SHA256 a6564a5ff373ab6b... Check 0f841d54ac6a44b4 (UTC 2026-11-04): PASS 16/16,
+  1.5440997x (scored 1.4425x), score 2439.156 us. Full decode-16 155.7 -> 122.6 us
+  (+28.1%), decode-32 284.4 -> 220.8 us (+28.3%); full decode-1 18.8 -> 20.1 us (-5.4%:
+  256-token splits leave each warp 2 tiles, so pipeline fill and the merge dominate);
+  other shapes unchanged code (-1.2..+3.5%). Fails the -3% rule only on full decode-1.
+
+## Attempt 37 - CUDA v3 from 8 sequences up
+
+- candidates/attempt37_cuda_full_decode_b8.py = attempt 36 with the CUDA kernel only for
+  batch >= 8 (2048-token splits); batch 1 keeps the Triton kernel (shape dispatch).
+  SHA256 01bf2a6c8e55fde8... Check 24504aba709d4041 pending.
