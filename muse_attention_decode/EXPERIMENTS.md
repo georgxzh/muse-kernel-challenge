@@ -667,3 +667,11 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Check 4ed0993157134f02: PASS 16/16, 1.5035582x. Full decode-16/32 141.3/238.6 us vs
   attempt 37/39's 121.9/221.7 us (-13.3/-7.4%): occupancy loss outweighs the deeper
   ring. Rejected; the 2-stage kernel (attempts 37/39) stays the best.
+
+### Attempt 39 scored
+
+- User approved (waiving decode-1 sliding, unchanged code). submission.py =
+  candidates/attempt39_cuda_full_decode_b8_remeasure.py (SHA256 42d97020..., unchanged since
+  check 5e6de4aaeb4f4737; server content_hash 3cb1d128d24d611c identical).
+- Scored run 7d6c77f92723446c (UTC 2026-11-04 14:56): PASS 16/16, 1.5464220x (CI
+  1.5232256-1.5696183), score 2435.493 us. Board 1.546x, rank 894 (was 997 at 1.442x).

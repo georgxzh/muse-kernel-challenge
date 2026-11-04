@@ -13,7 +13,7 @@ submit without asking, and log it here.
 |---|---|---|---|---|---|---|---|
 | 2026-11-04 05:27 | muse_decode_layer | candidate_mixed_tiles33.py, attempt 18 (33d2fc1f9f63cd6f) | 7b1b48545b4340f1 (8e716eed11171122), 1.3030x | 5d42151d048d4a03 (server hash 8e716eed11171122, matches) | PASS 1.3023x (CI 1.283-1.322) | 976 (was 1131) | user, explicit |
 | 2026-11-04 06:50 | muse_decode_layer | candidate_cuda_full_decode.py, attempt 20 (8b3b01ee8948298d) | 514225bb47ed4939 (67184bed0c55de5a), 1.3230x | 444f66ab63174de2 (server hash 67184bed0c55de5a, matches) | PASS 1.3266x | 974 (was 976) | autonomous (overnight rule) |
-| 2026-11-04 14:56 | muse_attention_decode | candidates/attempt39_cuda_full_decode_b8_remeasure.py (42d97020e63fa40f) | 5e6de4aaeb4f4737 (3cb1d128d24d611c), 1.5415x | 7d6c77f92723446c | pending | | user, explicit (waiver) |
+| 2026-11-04 14:56 | muse_attention_decode | candidates/attempt39_cuda_full_decode_b8_remeasure.py (42d97020e63fa40f) | 5e6de4aaeb4f4737 (3cb1d128d24d611c), 1.5415x | 7d6c77f92723446c (server hash 3cb1d128d24d611c, matches) | PASS 1.5464x (CI 1.523-1.570) | 894 (was 997) | user, explicit (waiver) |
 
 ## Rule checks behind each submission
 
