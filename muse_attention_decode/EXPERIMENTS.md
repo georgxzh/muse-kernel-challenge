@@ -675,3 +675,21 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   check 5e6de4aaeb4f4737; server content_hash 3cb1d128d24d611c identical).
 - Scored run 7d6c77f92723446c (UTC 2026-11-04 14:56): PASS 16/16, 1.5464220x (CI
   1.5232256-1.5696183), score 2435.493 us. Board 1.546x, rank 894 (was 997 at 1.442x).
+
+## Attempts 42-43 - one fused CUDA kernel for sliding-window decode
+
+- candidates/cuda/attn_sliding_decode.cu: _prepare + attention + _combine_gate in one launch
+  for sliding decode (L = 1, 16/2 heads, D = 64), all batch sizes. Each CTA (sequence,
+  split) computes its 16 query heads from qkv as _prepare does (FP32 RMSNorm eps 1e-5,
+  interleaved RoPE with libdevice powf/cosf/sinf and IEEE division, BF16 round, E4M3);
+  the CTA holding the new token writes its K/V cache rows (K / k_scale, V / v_scale, E4M3)
+  and fences them before staging; the attention loop is the v3 full-decode kernel's
+  (whole-row cp.async, FP8 mma.sync, P x256 E4M3 as FA3's FP8 path); the last CTA of the
+  sequence (counter reset by it) does _combine_gate's LSE combine, BF16 round, RMSNorm and
+  x sigmoid(gate). Same splits as the Triton sliding path (128-token chunks below 8
+  sequences, 256 from 8). 168 registers, 108 B spill.
+- Attempt 42 (SHA256 d1d338bdc0f45648...), check 516ad7a8f2fe463c: FAILED to build: the
+  host wrapper passed int64_t* (long*) where the kernel takes const long long*. NVRTC
+  checks device code only; host wrappers are first compiled by the judge.
+- Attempt 43 = attempt 42 with the casts fixed (SHA256 d01306aeae95f7d9...); check
+  f4c1018d07b44f34 pending.
