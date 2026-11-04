@@ -621,3 +621,20 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - candidates/attempt37_cuda_full_decode_b8.py = attempt 36 with the CUDA kernel only for
   batch >= 8 (2048-token splits); batch 1 keeps the Triton kernel (shape dispatch).
   SHA256 01bf2a6c8e55fde8... Check 24504aba709d4041 pending.
+
+## Attempt 38 - CUDA full-layer verify kernel (replaces FA3 for 8+ sequences)
+
+- candidates/cuda/attn_full_verify.cu, combined with the v3 decode kernel in
+  candidates/attempt38_cuda_full_verify.py (one load_inline module). Full verify with
+  L = 8, 16/2 heads, D = 64 and batch >= 8 now runs _prepare -> CUDA verify ->
+  _combine_gate instead of FA3; verify batch 1 keeps the Triton kernel; other head
+  configs keep FA3. SHA256 3718c826d0c1a3ac...
+- One CTA per (sequence, split), both KV heads; 128 threads stage each 32-token tile's
+  whole K/V rows with coalesced cp.async (2 stages, 16 KB); warp w owns 32 query rows
+  (KV head w / 2, block tokens 4 (w % 2)..+3, 8 query heads), so no cross-warp merge.
+  Q.K^T in natural byte order (2 k-steps per KV head, no wasted MMA), P (x256 E4M3) .V
+  with an 8-byte-per-token V read + PRMT transpose; causal mask ts <= seqlen - 8 + j.
+  168 registers, no spills.
+- Lane-level emulation (tools/emulate_full_verify.py) matches direct causal attention
+  to 2e-15 over page 1/64, partial tiles, an empty split and a split holding only the
+  block's own tokens. Check 536cc9c650bd4e41 pending.
