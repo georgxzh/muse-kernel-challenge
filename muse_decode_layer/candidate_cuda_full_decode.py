@@ -1,5 +1,5 @@
 # okc: problem=muse_decode_layer
-# Attempt 20: attempt 18 + muse_attention_decode attempt 34's CUDA full-layer decode kernel.
+# Attempt 20: attempt 18 + muse_attention_decode attempt 37's CUDA full-layer decode kernel (B >= 8).
 """SGLang's decoder layer for Muse Spark Open, as one H200 runs it under TP8/EP8, at SGLang commit
 a55ab7d5ae1bba59ac351e55026fe7f7644ecc5f (MuseSpark1xDecoderLayer.forward), with the same modules:
 
@@ -538,6 +538,13 @@ _FULL_DECODE_CU = r"""
 //  * Softmax in FP32, base-2, per warp; the CTA's 4 warps (disjoint 32-token tiles) are
 //    merged at the end like split-KV partials.
 // Every key in [split * chunk, min(seqlen, (split + 1) * chunk)) is read and weighted.
+//
+// v3 data path: each warp stages its 32-token tiles' whole K and V rows into shared
+// memory with cp.async (2 stages, page-table entries fetched one tile further ahead);
+// 8 lanes copy one row, so every copy instruction moves 4 whole 128-byte rows,
+// then reads MMA fragments from shared memory (16-byte chunks XOR-swizzled by row so
+// the fragment reads are bank-conflict free). The 4 warps' buffers are reused for the
+// final merge.
 
 #if defined(__CUDACC_RTC__)
 typedef unsigned int uint32_t;
@@ -595,13 +602,36 @@ __device__ __forceinline__ uint32_t word(const uint4& v, int i) {
   return i == 0 ? v.x : i == 1 ? v.y : i == 2 ? v.z : v.w;
 }
 
-__device__ __forceinline__ long long cache_row(const int* __restrict__ pt_b, int ts, int page) {
-  return (long long)pt_b[ts / page] * page + ts % page;
+__device__ __forceinline__ int cache_row(const int* __restrict__ pt_b, int ts, int page) {
+  return pt_b[ts / page] * page + ts % page;
 }
 
 }  // namespace muse_fd
 
-extern "C" __global__ void __launch_bounds__(128)
+
+namespace muse_fd {
+
+__device__ __forceinline__ uint32_t smem_u32(const void* p) {
+  return (uint32_t)__cvta_generic_to_shared(p);
+}
+
+__device__ __forceinline__ void cp_async16(uint32_t dst, const uint8_t* src) {
+  asm volatile("cp.async.cg.shared.global [%0], [%1], 16;\n" :: "r"(dst), "l"(src));
+}
+
+__device__ __forceinline__ void cp_async_commit() { asm volatile("cp.async.commit_group;\n" ::); }
+
+template <int N>
+__device__ __forceinline__ void cp_async_wait() { asm volatile("cp.async.wait_group %0;\n" :: "n"(N)); }
+
+__device__ __forceinline__ uint4 lds16(const uint8_t* p) { return *reinterpret_cast<const uint4*>(p); }
+
+// Byte offset of 16-byte chunk c of tile row r (row = 128 bytes, 8 chunks), XOR-swizzled.
+__device__ __forceinline__ int sw(int r, int c) { return r * ROW + ((c ^ (r & 7)) << 4); }
+
+}  // namespace muse_fd
+
+extern "C" __global__ void __launch_bounds__(128, 3)
 muse_attn_full_decode(const uint8_t* __restrict__ Q,     // [B, 16, 64] E4M3
                       const uint8_t* __restrict__ KC,    // [rows, 128] E4M3
                       const uint8_t* __restrict__ VC,    // [rows, 128] E4M3
@@ -613,9 +643,8 @@ muse_attn_full_decode(const uint8_t* __restrict__ Q,     // [B, 16, 64] E4M3
                       float* __restrict__ LSE,           // [B, 2, splits, 8]
                       int page, int pt_stride, int splits, int chunk, float sm_scale) {
   using namespace muse_fd;
-  __shared__ float s_o[WARPS][HQ][ROW];
-  __shared__ float s_m[WARPS][HQ];
-  __shared__ float s_z[WARPS][HQ];
+  // [warp][stage][K, V][TILE rows][128 bytes] = 64 KB; reused as the merge buffers.
+  extern __shared__ __align__(128) uint8_t smem[];
 
   const int split = blockIdx.x;
   const int b = blockIdx.y;
@@ -628,6 +657,7 @@ muse_attn_full_decode(const uint8_t* __restrict__ Q,     // [B, 16, 64] E4M3
   const int end = min(begin + chunk, seqlen);
   const float scale = KS[0] * sm_scale * 1.4426950408889634f;
   const int* pt_b = PT + (long long)b * pt_stride;
+  uint8_t* wbuf = smem + warp * (2 * 2 * TILE * ROW);
 
   // Q A-fragments. Thread (g, t) holds 32 bytes of one query head: t < 2 -> head g (KV head 0),
   // bytes t*32..t*32+31 of its 64; t >= 2 -> head 8 + g (KV head 1), bytes (t-2)*32... .
@@ -648,39 +678,64 @@ muse_attn_full_decode(const uint8_t* __restrict__ Q,     // [B, 16, 64] E4M3
 #pragma unroll
   for (int nt = 0; nt < 16; ++nt) o[nt][0] = o[nt][1] = o[nt][2] = o[nt][3] = 0.f;
   float m_lo = MUSE_NEG_INF, m_hi = MUSE_NEG_INF;  // running max, rows g and g + 8 (quad-uniform)
-  float z_lo = 0.f, z_hi = 0.f;              // this thread's partial sums of p
+  float z_lo = 0.f, z_hi = 0.f;                    // this thread's partial sums of p
 
-  for (int base = begin + warp * TILE; base < end; base += WARPS * TILE) {
-    const bool full = base + TILE <= end;
-    // ---- Issue every load of the tile first: K (this thread's token in n-tile j is
-    // base + 8j + g, bytes 32t..32t+31) and V (8 tokens in logical-k order, bytes 16g..16g+15).
-    // Masked keys read a valid row; their logits are -inf and p = 0.
-    uint4 kr[4][2];
-#pragma unroll
-    for (int j = 0; j < 4; ++j) {
-      int ts = base + 8 * j + g;
-      ts = ts < end ? ts : begin;
-      const uint8_t* p = KC + cache_row(pt_b, ts, page) * ROW + t * 32;
-      kr[j][0] = ldg16(p);
-      kr[j][1] = ldg16(p + 16);
-    }
-    uint4 vr[8];
+  // This warp's tiles start at begin + warp * TILE, every WARPS * TILE tokens. Lane l looks
+  // up the cache row of token (tile base + l); keys past `end` use the row of `begin`
+  // (always valid) and their logits are masked to -inf. Staging: in copy i, lane l moves
+  // chunk l % 8 of tile row l / 8 + 4i (row index shuffled from its owner lane), so each
+  // instruction copies 4 whole 128-byte rows.
+  const int step = WARPS * TILE;
+  const int first = begin + warp * TILE;
+  auto row_of = [&](int base) -> int {
+    int ts = base + lane;
+    ts = ts < end ? ts : begin;
+    return cache_row(pt_b, ts, page);
+  };
+  auto stage_tile = [&](int st, int my_row) {
+    uint8_t* kb = wbuf + st * (2 * TILE * ROW);
+    uint8_t* vb = kb + TILE * ROW;
+    const int c = lane & 7;
 #pragma unroll
     for (int i = 0; i < 8; ++i) {
-      int ts = base + 2 * t + (i & 1) + 8 * (i >> 1);
-      ts = ts < end ? ts : begin;
-      vr[i] = ldg16(VC + cache_row(pt_b, ts, page) * ROW + 16 * g);
+      const int r = (lane >> 3) + 4 * i;
+      const long long row = __shfl_sync(0xffffffff, my_row, r);
+      cp_async16(smem_u32(kb + sw(r, c)), KC + row * ROW + 16 * c);
+      cp_async16(smem_u32(vb + sw(r, c)), VC + row * ROW + 16 * c);
     }
-    // ---- Q.K^T: 4 n-tiles of 8 tokens.
+  };
+  int row_next = 0;
+  if (first < end) {
+    stage_tile(0, row_of(first));
+    if (first + step < end) row_next = row_of(first + step);
+  }
+  cp_async_commit();
+
+  int it = 0;
+  for (int base = first; base < end; base += step, ++it) {
+    // Stage the next tile (its row was looked up one iteration ago), then look up the one after.
+    if (base + step < end) stage_tile((it + 1) & 1, row_next);
+    cp_async_commit();
+    if (base + 2 * step < end) row_next = row_of(base + 2 * step);
+    cp_async_wait<1>();  // this tile's group has landed
+    __syncwarp();
+    const uint8_t* kb = wbuf + (it & 1) * (2 * TILE * ROW);
+    const uint8_t* vb = kb + TILE * ROW;
+    const bool full = base + TILE <= end;
+
+    // ---- Q.K^T: 4 n-tiles of 8 tokens; this thread's token in n-tile j is row 8j + g,
+    // bytes 32t..32t+31 = chunks 2t and 2t+1.
     float c[4][4];
 #pragma unroll
     for (int j = 0; j < 4; ++j) {
+      const int r = 8 * j + g;
+      const uint4 k0 = lds16(kb + sw(r, 2 * t)), k1 = lds16(kb + sw(r, 2 * t + 1));
+      const uint32_t kw[8] = {k0.x, k0.y, k0.z, k0.w, k1.x, k1.y, k1.z, k1.w};
       c[j][0] = c[j][1] = c[j][2] = c[j][3] = 0.f;
 #pragma unroll
       for (int s = 0; s < 4; ++s) {
         const uint32_t lo = qw[2 * s], hi = qw[2 * s + 1];
-        const uint32_t b0 = word(kr[j][s >> 1], (2 * s) & 3), b1 = word(kr[j][s >> 1], (2 * s + 1) & 3);
-        mma_e4m3(c[j], kv0 ? lo : 0u, kv0 ? 0u : lo, kv0 ? hi : 0u, kv0 ? 0u : hi, b0, b1);
+        mma_e4m3(c[j], kv0 ? lo : 0u, kv0 ? 0u : lo, kv0 ? hi : 0u, kv0 ? 0u : hi, kw[2 * s], kw[2 * s + 1]);
       }
     }
     // c[j][0..1]: row g, tokens base + 8j + 2t + {0, 1}; c[j][2..3]: row g + 8, same tokens.
@@ -690,8 +745,8 @@ muse_attn_full_decode(const uint8_t* __restrict__ Q,     // [B, 16, 64] E4M3
 #pragma unroll
       for (int e = 0; e < 2; ++e) {
         const bool ok = full || (base + 8 * j + 2 * t + e < end);
-        float a = ok ? c[j][e] * scale : MUSE_NEG_INF;
-        float bb = ok ? c[j][2 + e] * scale : MUSE_NEG_INF;
+        const float a = ok ? c[j][e] * scale : MUSE_NEG_INF;
+        const float bb = ok ? c[j][2 + e] * scale : MUSE_NEG_INF;
         c[j][e] = a;
         c[j][2 + e] = bb;
         mx_lo = fmaxf(mx_lo, a);
@@ -731,6 +786,10 @@ muse_attn_full_decode(const uint8_t* __restrict__ Q,     // [B, 16, 64] E4M3
     const uint32_t pa1 = pack_e4m3(c[0][2] * 256.f, c[0][3] * 256.f, c[1][2] * 256.f, c[1][3] * 256.f);
     const uint32_t pa2 = pack_e4m3(c[2][0] * 256.f, c[2][1] * 256.f, c[3][0] * 256.f, c[3][1] * 256.f);
     const uint32_t pa3 = pack_e4m3(c[2][2] * 256.f, c[2][3] * 256.f, c[3][2] * 256.f, c[3][3] * 256.f);
+    // ---- V: this thread's 8 tokens (logical-k order), bytes 16g..16g+15 = chunk g.
+    uint4 vr[8];
+#pragma unroll
+    for (int i = 0; i < 8; ++i) vr[i] = lds16(vb + sw(2 * t + (i & 1) + 8 * (i >> 1), g));
     // ---- P.V: n-tile nt, column g <-> row byte 16g + nt. B regs: bytes nt of tokens
     // vr[0..3] (b0..b3) and vr[4..7] (b4..b7): a 4x4 byte transpose per 32-bit word.
 #pragma unroll
@@ -750,13 +809,20 @@ muse_attn_full_decode(const uint8_t* __restrict__ Q,     // [B, 16, 64] E4M3
 #pragma unroll
       for (int k = 0; k < 4; ++k) mma_e4m3(o[4 * w + k], pa0, pa1, pa2, pa3, bt[0][k], bt[1][k]);
     }
+    __syncwarp();  // this stage is restaged two iterations later only after every lane is done
   }
+  cp_async_wait<0>();
 
-  // ---- Merge the 4 warps. o[nt][e] (row g) / o[nt][2+e] (row g+8) is row byte (2t+e)*16 + nt.
+  // ---- Merge the 4 warps (reusing the staging buffers). o[nt][e] (row g) / o[nt][2+e]
+  // (row g+8) is row byte (2t+e)*16 + nt.
   z_lo += __shfl_xor_sync(0xffffffff, z_lo, 1);
   z_lo += __shfl_xor_sync(0xffffffff, z_lo, 2);
   z_hi += __shfl_xor_sync(0xffffffff, z_hi, 1);
   z_hi += __shfl_xor_sync(0xffffffff, z_hi, 2);
+  __syncthreads();
+  float (*s_o)[HQ][ROW] = reinterpret_cast<float (*)[HQ][ROW]>(smem);            // 32 KB
+  float (*s_m)[HQ] = reinterpret_cast<float (*)[HQ]>(smem + WARPS * HQ * ROW * 4);
+  float (*s_z)[HQ] = reinterpret_cast<float (*)[HQ]>(smem + WARPS * HQ * ROW * 4 + WARPS * HQ * 4);
   if (t == 0) {
     s_m[warp][g] = m_lo; s_m[warp][g + 8] = m_hi;
     s_z[warp][g] = z_lo; s_z[warp][g + 8] = z_hi;
@@ -798,8 +864,14 @@ void attn_full_decode(torch::Tensor q, torch::Tensor kc, torch::Tensor vc, torch
                       torch::Tensor lens, torch::Tensor ks, torch::Tensor vs, torch::Tensor part,
                       torch::Tensor lse, int64_t page, int64_t pt_stride, int64_t splits,
                       int64_t chunk, double sm_scale) {
+  constexpr int kSmem = 4 * 2 * 2 * 32 * 128;  // 64 KB: per-warp double-buffered K/V tiles
+  static bool configured = false;
+  if (!configured) {
+    cudaFuncSetAttribute(muse_attn_full_decode, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmem);
+    configured = true;
+  }
   dim3 grid((unsigned)splits, (unsigned)q.size(0));
-  muse_attn_full_decode<<<grid, 128, 0, at::cuda::getCurrentCUDAStream()>>>(
+  muse_attn_full_decode<<<grid, 128, kSmem, at::cuda::getCurrentCUDAStream()>>>(
       (const uint8_t*)q.data_ptr(), (const uint8_t*)kc.data_ptr(), (const uint8_t*)vc.data_ptr(),
       pt.data_ptr<int>(), lens.data_ptr<int>(), ks.data_ptr<float>(), vs.data_ptr<float>(),
       part.data_ptr<float>(), lse.data_ptr<float>(), (int)page, (int)pt_stride, (int)splits,
@@ -807,7 +879,7 @@ void attn_full_decode(torch::Tensor q, torch::Tensor kc, torch::Tensor vc, torch
 }
 """
 _FULL_DECODE = load_inline(
-    name="muse_attn_full_decode_v1",
+    name="muse_attn_full_decode_v3",
     cpp_sources="void attn_full_decode(torch::Tensor q, torch::Tensor kc, torch::Tensor vc, torch::Tensor pt, "
                 "torch::Tensor lens, torch::Tensor ks, torch::Tensor vs, torch::Tensor part, torch::Tensor lse, "
                 "int64_t page, int64_t pt_stride, int64_t splits, int64_t chunk, double sm_scale);",
@@ -1001,7 +1073,7 @@ def _attention_block(data, qkv):
     partial = torch.empty((b, hk, splits, rows, d), device=qkv.device, dtype=torch.float32)
     lse = torch.empty((b, hk, splits, rows), device=qkv.device, dtype=torch.float32)
     out = torch.empty((b, length, hq * d), device=qkv.device, dtype=torch.bfloat16)
-    if not window and length == 1 and hq == 16 and hk == 2 and d == 64:
+    if not window and length == 1 and hq == 16 and hk == 2 and d == 64 and b >= 8:
         _FULL_DECODE.attn_full_decode(
             q, data["k_cache"], data["v_cache"], data["page_table"], data["cache_seqlens"],
             data["k_scale"], data["v_scale"], partial, lse, cfg["page_size"],

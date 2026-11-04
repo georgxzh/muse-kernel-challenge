@@ -493,3 +493,16 @@ correctness or performance result.
   identical for check and scored run). Attempt 14 was never scored (18 contains it).
 - Scored run 5d42151d048d4a03 (UTC 2026-11-04 05:27): PASS, every test and recheck,
   1.3023034x (CI 1.2827688-1.3218379), score 17369.455 us.
+
+## Attempt 20: attempt 18 + attention attempt 37's CUDA full-layer decode kernel (B >= 8)
+
+- candidate_cuda_full_decode.py: _attention_block uses muse_attention_decode's CUDA
+  full-decode kernel v3 (whole-row cp.async staging, FP8 mma.sync; load_inline) for
+  full-layer decode with >= 8 sequences; everything else is attempt 18.
+  SHA256 8b3b01ee8948298dd766d31232ee4b84325c84cb2bb9f11c0b3b7a7a1482eaed.
+- Check 514225bb47ed4939 (UTC 2026-11-04): PASS, every recheck, 1.3229902x
+  (content_hash 67184bed0c55de5a).
+- vs mean of attempt 18's two runs: full decode-16 +11.0% (354 -> 316 us), decode-32
+  +14.2% (505 -> 432 us); unchanged shapes -0.1% (worst verify-16 sliding -1.8%).
+  Passes the verified-better rule (overall 1.3230 > scored 1.3023): scored run
+  submitted under the user's overnight standing rule (SUBMISSION_LOG.md).
