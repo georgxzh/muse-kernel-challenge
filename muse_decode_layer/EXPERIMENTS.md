@@ -436,3 +436,12 @@ correctness or performance result.
   -0.6/-0.7% vs attempt 13: SGLang's post-expert-norm wrapper was the ~25 us of
   PyTorch reduce/elementwise kernels. Re-measured as candidate_postnorm_b.py
   (comment-only copy), check 7f2f5696daac4d16.
+- Re-check of the comment-only copy candidate_postnorm_b.py (SHA256
+  1116ba7d520dccf60669f7af1c83fa2c4c86a56f986909085f6279b2bdaf50c5), check
+  7f2f5696daac4d16 (UTC 2026-11-04): PASS 13/13 tests, every recheck, no flags.
+  1.2743084x, score 17751.040 us (scored attempt 13: 1.1813x).
+- vs attempt 13's two runs: decode-1 +20.1/+18.5%, decode-16 +17.2/+9.8%,
+  verify-1 +15.8/+15.7%; decode-32, verify-16/32 -0.3 to -0.7%. All shapes
+  +7.5% (geomean). Verified better: recommend a scored run of
+  candidate_postnorm_b.py (pending approval). The earlier routing failure did
+  not recur (seed-dependent near-tie in the reference's top-8).
