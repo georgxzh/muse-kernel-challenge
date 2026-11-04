@@ -1,0 +1,19 @@
+Triton 3.5.1
+router_split_m2:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 48 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=21
+router_split_m8:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 48 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=21
+router_split_m9:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 48 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=21
+router_split_m16:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 48 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=21
+router_split_m32:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 72 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=7
+router_small_m1:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 30 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=6
+tiled_qkv_gate_m1_serial0:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 54 registers, used 1 barriers | atomics=[] fences=[] BAR=35
+tiled_qkv_gate_m16_serial0:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 54 registers, used 1 barriers | atomics=[] fences=[] BAR=35
+tiled_pooler_m7_serial0:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 54 registers, used 1 barriers | atomics=[] fences=[] BAR=35
+tiled_unpooler_m1_serial0:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 62 registers, used 1 barriers | atomics=[] fences=[] BAR=19
+tiled_unpooler_m5_serial0:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 62 registers, used 1 barriers | atomics=[] fences=[] BAR=19
+tiled_unpooler_m8_serial0:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 62 registers, used 1 barriers | atomics=[] fences=[] BAR=19
+tiled_qkv_gate_m1_serial1:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 40 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=37
+tiled_qkv_gate_m16_serial1:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 40 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=37
+tiled_pooler_m7_serial1:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 40 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=37
+tiled_unpooler_m1_serial1:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 48 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=21
+tiled_unpooler_m5_serial1:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 48 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=21
+tiled_unpooler_m8_serial1:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads | Used 48 registers, used 1 barriers | atomics=['ATOMG.E.ADD.STRONG.GPU', 'ATOMG.E.EXCH.STRONG.GPU'] fences=['CCTL.IVALL', 'MEMBAR.ALL.GPU'] BAR=21

@@ -305,3 +305,17 @@ Changed shapes count as one group. A candidate is verified better when the group
   1.1735568x (CI 1.1559534-1.1911601), score 4116.375 us. Board row now this
   run: 1.174x, rank 1227 (was 1246 at 1.170x). Result in
   attempts/submit_15.json, profiles/submission.ae15f0330a304a41.*.
+
+## Attempt 16: BF16 split-K partials (rules 2026-11-03)
+
+- attempts/attempt16_bf16_partials.py = scored attempt 15 with the tiled
+  qkv_gate/pooler/unpooler split-K partials stored in BF16; the last CTA sums
+  them in FP32 (same fixed order). The router keeps FP32 partials (0.01%
+  tolerance). Single-nonzero rows stay exact (one nonzero partial).
+  Offline PASS, no spills (attempts/offline_16.txt, tools/compile_serial_bf16p.py).
+- Source SHA256: 0f205efe3ab0eee78264a29788c2bab3b6b75380981344c37d47833593394739
+- Check 8e8708792893458f (UTC 2026-11-04): PASS 9/9, 1.1794488x, score 4095.812 us.
+- vs mean of attempt 15's two runs: all 8 changed shapes faster, +2.83% as a
+  group (qkv_gate decode-16 +7.0%, pooler decode-16 +4.4%, others +0.7..+2.7%);
+  unchanged -0.23% (worst router decode-16 -2.05%, unchanged code).
+- Verified better (overall 1.1794 > scored 1.1736). Scored run pending approval.
