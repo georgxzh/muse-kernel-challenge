@@ -693,3 +693,10 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   checks device code only; host wrappers are first compiled by the judge.
 - Attempt 43 = attempt 42 with the casts fixed (SHA256 d01306aeae95f7d9...); check
   f4c1018d07b44f34 pending.
+- Attempt 43 check 5a96395b1bdd4698 (the retry f4c1018d was deduplicated into it): PASS
+  16/16, 1.3493158x. Sliding decode-1/16/32 21.3/20.2/23.6 us vs 8.4/13.8/16.9 (kernel
+  17.0/15.9/19.2 us): the last CTA's combine looped over splits with serialized L2 loads.
+- Attempt 44 (combine loads every split at once; SHA256 3d944539611e1e19...) check
+  ea5abace55dd492f: PASS 16/16, 1.4107466x. Sliding decode-1/16/32 16.4/18.7/22.6 us
+  (kernel 13.2 us at decode-1) vs 8.4/13.8/16.9 us: still far slower than the PDL Triton
+  chain. Fused sliding approach dropped.
