@@ -567,3 +567,23 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   group); unchanged shapes -0.8% (worst decode-16 sliding -2.9%, identical
   code). Overall 1.4449 > scored 1.4425. Marginal (expected board gain ~0.2-0.3%,
   about the noise on these small shapes).
+
+## Attempt 34 - CUDA full-layer decode kernel with whole-row gathers (pending)
+
+- candidates/cuda/attn_full_decode.cu, embedded in candidates/attempt34_cuda_full_decode.py
+  and built at import with load_inline (nvcc, sm_90a). Replaces _attention_parts for
+  full-layer decode (L = 1, 16 query heads, 2 KV heads, D = 64); _prepare, _combine_gate,
+  sliding and FA3 paths unchanged. SHA256 1dcccc84eadc75d8...
+- One CTA per (sequence, split) covers both KV heads, so each token's K and V rows are
+  gathered as whole 128-byte rows (diagnostic 01: 1.55x faster than half rows).
+  mma.sync m16n8k32 E4M3 for Q.K^T (16 query rows, block-diagonal over the two KV heads,
+  row bytes in a permuted order shared by Q and K so each B fragment is two 16-byte
+  loads) and P.V (P x256 in E4M3 as before; tokens and output bytes permuted so each V
+  operand is one 16-byte load + a 4x4 PRMT byte transpose). FP32 base-2 online softmax
+  per warp; 4 warps merged at the end; same PART/LSE layout and values as
+  _attention_parts. Every key in each split is read and weighted.
+- Offline: NVRTC + ptxas (tools/nvrtc_compile.py): 233 registers, no spills, 33 KB
+  smem. Lane-level numpy emulation of every fragment/permutation
+  (tools/emulate_full_decode.py) matches direct attention to 1e-15 over full and
+  partial tiles, page 1 and 64, and an empty split.
+- Check f004af3159cf4dc7 pending.
