@@ -519,3 +519,10 @@ correctness or performance result.
 - candidate_cuda_full_verify.py. SHA256 62f135140887e1ab...
 - Check 1b2018de8794495b: PASS, 1.2995845x. Full verify-16/32 -16.3/-20.8% (the
   verify kernel is slower than FA3; see attention attempts 38/40). Rejected.
+
+## Attempt 22: attempt 20 + muse_bf16_proj attempt 17's CUDA GEMV for T <= 8
+
+- candidate_cuda_gemv.py. SHA256 f2e0dcf0cb8df608...
+- Check 963bb2ccd251450d: PASS, 1.3041342x (scored attempt 20: 1.3266x). Changed shapes
+  decode-1 -2.3/-1.2%, verify-1 -6.1/-7.2%: the CUDA GEMV is slower than the Triton
+  split-K GEMMs here too (bf16_proj attempt 17). Rejected.
