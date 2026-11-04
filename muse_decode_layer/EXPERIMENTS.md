@@ -485,3 +485,11 @@ correctness or performance result.
 - candidate_fp16_pv_verify.py. SHA256 66d158e220a10ff8...
 - Check b7b2839ae0ed4fb8: PASS, 1.3014725x (attempt 18: 1.3030x). Changed
   sliding-verify shapes -0.9% as a group (verify-16 sliding -5.1%). Rejected.
+
+### Attempt 18 scored
+
+- User approved. submission.py = candidate_mixed_tiles33.py (SHA256 33d2fc1f...,
+  unchanged since check 7b1b48545b4340f1; server content_hash 8e716eed11171122...
+  identical for check and scored run). Attempt 14 was never scored (18 contains it).
+- Scored run 5d42151d048d4a03 (UTC 2026-11-04 05:27): PASS, every test and recheck,
+  1.3023034x (CI 1.2827688-1.3218379), score 17369.455 us.
