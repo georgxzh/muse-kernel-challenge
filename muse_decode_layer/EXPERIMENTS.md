@@ -479,3 +479,9 @@ correctness or performance result.
   shapes -1.7..+0.9% except verify-32 sliding -2.9% (code identical to attempt
   17 there). Verified better than attempt 17 (1.2990x) and scored 1.1813x:
   recommend the scored run use this file (pending approval).
+
+## Attempt 19: attempt 18 + FP16 P.V for sliding verify (attention attempt 33)
+
+- candidate_fp16_pv_verify.py. SHA256 66d158e220a10ff8...
+- Check b7b2839ae0ed4fb8: PASS, 1.3014725x (attempt 18: 1.3030x). Changed
+  sliding-verify shapes -0.9% as a group (verify-16 sliding -5.1%). Rejected.
