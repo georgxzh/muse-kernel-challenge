@@ -327,3 +327,15 @@ Changed shapes count as one group. A candidate is verified better when the group
   91bee39390902a9e... identical for check and scored run).
 - Scored run 35e70406100a4526 (UTC 2026-11-04): PASS 9/9, 1.1992070x (CI
   1.1812189-1.2171951), score 4028.329 us. Result in attempts/submit_16.json.
+
+## Attempt 17: CUDA tensor-core GEMV for the BF16 layers at m <= 16
+
+- cuda/gemv_bf16.cu, embedded in attempts/attempt17_cuda_gemv.py (load_inline, sm_90a):
+  y = x @ W^T for qkv_gate/o/pooler/unpooler with m <= 16 (replaces the tiled Triton
+  kernels and cuBLAS for o there). mma.sync m16n8k16 BF16 -> FP32; each lane reads 32
+  contiguous bytes of its weight row per 64-element chunk (128-byte lines), with a fixed K
+  permutation shared by x and W so the A fragments come from the same contiguous bytes;
+  4 chunks in flight per lane; split-K over CTAs (about 1024 CTAs, K ranges >= 256) with
+  FP32 partials summed in split order by the last CTA (self-resetting counters). Router and
+  m > 16 unchanged. 44 registers, no spills; lane-level emulation (tools/emulate_gemv.py)
+  matches x @ W^T to 6e-14. SHA256 e4bfb416c119233a... Check ef209cbccccd4fd8 pending.
