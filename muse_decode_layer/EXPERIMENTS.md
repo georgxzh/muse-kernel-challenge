@@ -400,3 +400,26 @@ correctness or performance result.
   1.1437. Recommend a scored run (pending approval).
 - The ~20 us of PyTorch reduce/elementwise kernels at decode-1 remain, so they
   are not from the output norm-gate.
+
+### Attempt 13 scored
+
+- User approved. submission.py = candidate_attn_port.py (SHA256 78fc6fee...,
+  unchanged since check fd2f6e47f0834a12; server content_hash 497f1f7f59fb8a63...
+  identical for check and scored run).
+- Scored run e6b6f1aba2984e63 (UTC 2026-11-04): PASS, every test and recheck,
+  1.1812750x (CI 1.1635558-1.1989941), score 19149.056 us. Board row: 1.181x,
+  rank 1125 (was 1159 at 1.144x).
+
+## Attempt 14: attempt 13 + muse_moe_w4a16's fused post-expert norm
+
+- candidate_postnorm.py: attempt 13 with SGLang's
+  fused_post_expert_norm_weighted_sum replaced by moe attempt 6's _post_norm_sum
+  (verbatim; same weight-first RMSNorm, eps 1e-8, FP32 weighted sum).
+  SHA256 b1f4b0df78dcddec03af8ca7da1ff5adc7bd32cb6fc28e7c59a27e535b0061b7.
+- Check c93807d00b7146ca: FAILED on the verify-1 full benchmark recheck
+  (repetition 9): "routing: 3 of this GPU's experts touched where the reference
+  touches 6". All 13 tests passed. The routing check runs on the returned
+  topk_ids, computed before the experts, so the post-norm cannot change them:
+  a seed-dependent near-tie (scores within ROUTE_TOL; the distinct-local slack
+  15% + 2 is strict at 8 tokens). Attempt 13 passed every recheck in two runs.
+  Timing was not measured; re-measure with a comment-only copy.
