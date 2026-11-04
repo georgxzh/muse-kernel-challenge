@@ -1,5 +1,6 @@
 # okc: problem=muse_bf16_proj
-"""Split-K tensor-core projections, with a fused hi/lo router; PDL into the router's second pass."""
+"""Split-K tensor-core projections, with a fused hi/lo router; PDL into the router's second pass;
+BF16 split-K partials for the BF16 layers (summed in FP32), FP32 partials for the router."""
 from typing import TypedDict
 
 import torch
@@ -47,13 +48,14 @@ def _serial_reduce(P, Y, CNT, tile, offs, mask, acc,
     self-resetting lock pattern SGLang's Marlin workspace uses. Counters hold
     no data between calls.
     """
-    tl.store(P + tl.program_id(2) * MN + offs, acc, mask)
+    tl.store(P + tl.program_id(2) * MN + offs, acc.to(P.dtype.element_ty), mask)
     tl.debug_barrier()          # every thread's partial is issued before the release
     ticket = tl.atomic_add(CNT + tile, 1, sem="acq_rel", scope="gpu")
     if ticket == SPLIT - 1:
-        total = tl.load(P + offs, mask, other=0.0, cache_modifier=".cg")
+        # Partials may be BF16 (rules 2026-11-03); the sum is always FP32.
+        total = tl.load(P + offs, mask, other=0.0, cache_modifier=".cg").to(tl.float32)
         for s in tl.static_range(1, SPLIT):
-            total += tl.load(P + s * MN + offs, mask, other=0.0, cache_modifier=".cg")
+            total += tl.load(P + s * MN + offs, mask, other=0.0, cache_modifier=".cg").to(tl.float32)
         tl.store(Y + offs, total.to(Y.dtype.element_ty), mask)
         tl.atomic_xchg(CNT + tile, 0, sem="relaxed", scope="gpu")
 
@@ -198,7 +200,8 @@ def kernel_fn(data: Inputs, state) -> torch.Tensor:
     bn = 32 if router else 64
     out = torch.empty((m, n), device=x.device,
                       dtype=torch.float32 if router else torch.bfloat16)
-    partial = torch.empty((split, m, n), device=x.device, dtype=torch.float32)
+    # BF16 partials for the BF16 layers; the router (0.01% tolerance) keeps FP32.
+    partial = torch.empty((split, m, n), device=x.device, dtype=torch.float32 if router else torch.bfloat16)
     # Single-kernel split-K (in-kernel last-CTA reduction) for the router;
     # the other layers keep the separate _finish pass.
     # Router m=32 lost 1.3% with the in-kernel reduction (attempt 11): keep _finish there.

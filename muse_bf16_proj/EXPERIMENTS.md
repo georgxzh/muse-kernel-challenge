@@ -319,3 +319,11 @@ Changed shapes count as one group. A candidate is verified better when the group
   group (qkv_gate decode-16 +7.0%, pooler decode-16 +4.4%, others +0.7..+2.7%);
   unchanged -0.23% (worst router decode-16 -2.05%, unchanged code).
 - Verified better (overall 1.1794 > scored 1.1736). Scored run pending approval.
+
+### Attempt 16 scored
+
+- User approved. submission.py = attempts/attempt16_bf16_partials.py (SHA256
+  0f205efe..., unchanged since check 8e8708792893458f; server content_hash
+  91bee39390902a9e... identical for check and scored run).
+- Scored run 35e70406100a4526 (UTC 2026-11-04): PASS 9/9, 1.1992070x (CI
+  1.1812189-1.2171951), score 4028.329 us. Result in attempts/submit_16.json.
