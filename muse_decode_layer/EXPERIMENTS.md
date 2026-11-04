@@ -379,3 +379,24 @@ correctness or performance result.
 - Not verified better (group gain inside noise; overall below scored 1.1437).
   The layer's launch chain is mostly SGLang/cuBLAS/FA3/Marlin kernels, so only
   ~5 short Triton-to-Triton edges exist. submission.py stays attempt 8.
+
+## Attempt 13: muse_attention_decode's attention kernels (attempt 17) in the layer
+
+- File candidate_attn_port.py = scored attempt 8 with the attention block
+  (_qkv_to_cache -> FA3 -> SGLang FusedRMSNormGate) replaced by
+  muse_attention_decode attempt 17's kernel_fn (scored there 7e9dd2b58e9746e4,
+  1.4425x), verbatim: _prepare (q/k RMSNorm, RoPE, FP8 cache store) ->
+  _attention_parts (FP8 QK, split-KV) -> _combine_gate (LSE combine, output
+  RMSNorm x sigmoid(gate)), PDL between them; FA3 + _gate for batched full
+  verify. Both references compute the same norm/RoPE/FP8-query attention.
+  The layer's GEMMs, router, MoE and boundaries are unchanged.
+- Source SHA256: 78fc6fee22a0bd18d4ebca7a2600b579e37e76d1c00f8f2d194b4f705e0d2d18
+- Check fd2f6e47f0834a12 (UTC 2026-11-04): PASS 13/13 tests, 12 shapes, no
+  flags. 1.1849885x, score 19089.046 us.
+- vs mean of attempt 8's two runs: decode-1 sliding/full +5.2/+4.0%,
+  decode-16 +2.8/+9.6%, decode-32 +4.1/+19.5% (590 -> 492 us), verify-1
+  +2.7/-0.1%, verify-16 -1.2/-0.8%, verify-32 -1.6/-1.5%.
+- Verified better: group gain, no shape below -3%, overall 1.1850 > scored
+  1.1437. Recommend a scored run (pending approval).
+- The ~20 us of PyTorch reduce/elementwise kernels at decode-1 remain, so they
+  are not from the output norm-gate.
