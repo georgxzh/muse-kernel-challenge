@@ -468,3 +468,14 @@ correctness or performance result.
   +12.1% (608 -> 534 us), verify-32 full +6.0% (960 -> 882 us); every other
   shape -0.13% to +1.7% (unchanged code). Verified better than attempt 14 and
   scored attempt 13. Recommend a scored run of this file (pending approval).
+
+## Attempt 18: adaptive 16/32-row Marlin tiles from 33 tokens
+
+- candidate_mixed_tiles33.py = attempt 17 with the adaptive tiles for T > 32
+  (adds T = 128, verify 16). SHA256 33d2fc1f9f63cd6f5e4122b96d0ba9568b06233811e1d1029ee57cc5e81e43a0.
+- Check 7b1b48545b4340f1: PASS 13/13, every recheck, no flags. 1.3029944x,
+  score 17360.244 us.
+- vs attempt 17: verify-16 sliding +6.5% (418 -> 395 us), full +2.6%; other
+  shapes -1.7..+0.9% except verify-32 sliding -2.9% (code identical to attempt
+  17 there). Verified better than attempt 17 (1.2990x) and scored 1.1813x:
+  recommend the scored run use this file (pending approval).
