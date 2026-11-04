@@ -407,3 +407,11 @@
   Marlin is 64-66% of the turn-1/turn-4 shapes; the grouped DeepGEMM path's
   fixed ~1,063 us NVFP4->BF16 expansion keeps it slower than Marlin below
   ~3,000 tokens. No change made.
+
+## Attempt 13: Marlin split-K partials in BF16 (rules 2026-11-03)
+
+- attempt13_marlin_bf16_reduce.py = scored attempt 10 with use_fp32_reduce=False
+  on the Marlin path (T < 4096). SHA256 dea4724084dba259...
+- Check 21faedff2d0a46ab: PASS, 1.1519654x (scored 1.1571x). Per shape vs the
+  scored run: turn-1 -1.3/-1.4%, turn-4 -0.4/-0.6%, first-turn -3.1/+0.6/+1.2/+2.2%
+  (the first-turn shapes use DeepGEMM, unchanged). Rejected.
