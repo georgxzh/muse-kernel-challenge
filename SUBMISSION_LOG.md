@@ -9,6 +9,7 @@ unchanged since the check whose server content_hash the scored run must match.
 | UTC | Board | File (SHA256) | Check (content_hash) | Scored job | Result | Rank | Approval |
 |---|---|---|---|---|---|---|---|
 | 2026-11-04 05:27 | muse_decode_layer | candidate_mixed_tiles33.py, attempt 18 (33d2fc1f9f63cd6f) | 7b1b48545b4340f1 (8e716eed11171122), 1.3030x | 5d42151d048d4a03 (server hash 8e716eed11171122, matches) | PASS 1.3023x (CI 1.283-1.322) | 976 (was 1131) | user, explicit |
+| 2026-11-04 06:50 | muse_decode_layer | candidate_cuda_full_decode.py, attempt 20 (8b3b01ee8948298d) | 514225bb47ed4939 (67184bed0c55de5a), 1.3230x | 444f66ab63174de2 | pending | | autonomous (overnight rule) |
 
 ## Rule checks behind each submission
 
@@ -16,3 +17,7 @@ unchanged since the check whose server content_hash the scored run must match.
   (changed group +4.5%); every other shape within -1.7..+0.9% except verify-32 sliding
   -2.9% (code identical to attempt 17 there). Overall 1.3030x > scored 1.1813x.
   Attempt 14 (1.2743x) was never scored: attempt 18 contains it and is better.
+- decode_layer attempt 20: vs attempt 18's two runs: changed shapes (full decode-16/32,
+  the only ones using the new kernel) +11.0% / +14.2% (+12.6% as a group); unchanged
+  shapes -0.1% on average, worst verify-16 sliding -1.8% (> -3%). Overall 1.3230x >
+  scored 1.3023x. Local SHA 8b3b01ee... equals the file checked as 514225bb47ed4939.
