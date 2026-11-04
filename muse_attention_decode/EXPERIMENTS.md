@@ -494,3 +494,28 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   verify-32 near its 127 us bound (~4.9 TB/s of random 128-byte gathers); ours
   is 2.3 TB/s and FA3 1.7 TB/s. Finding the limiter needs a profiler we do not
   have; further blind Triton variants are low-yield.
+
+## Diagnostic 01 - gather bandwidth probes (check only, never submitted)
+
+- candidates/diag01_gather_probe.py = attempt 17 + five read-only probe
+  kernels run on full decode-16/32 after the real output (same CTA grid and
+  2048-token chunks as the attention launch). Each reads every cached token's
+  K and V and folds the words into one value. Check 7d083939a93e4711 (PASS;
+  timings of those shapes include the probes).
+- decode-32 full (us): attention 275.4; half rows (64 B per CTA, as ours)
+  N=128 253.5 / N=512 253.8; whole 128-byte rows N=128 163.8 / N=512 164.0;
+  the same bytes sequential 145.1. decode-16 full: 147.2; 129.5 / 121.3;
+  89.7 / 82.8; 72.5.
+- Finding: our kernel sits at the half-row gather floor. Whole-row gathers are
+  1.55x faster; loads in flight (N) do not matter. The both-heads kernel
+  (attempt 21) had the right access but 201 regs (2 CTAs x 4 warps per SM).
+
+## Attempt 24 - _prepare fused into the attention kernel
+
+- candidates/attempt24_fused_prepare.py: each CTA computes its own query rows
+  (RMSNorm, RoPE, BF16, FP8) from qkv and writes the new tokens' K/V rows in
+  its range; FA3 path keeps _prepare. SHA256 cae18ff4de423d94b21c286dfebc6d3f3e4921f8d6c2af07cb95f73ff6f56f24.
+  Offline PASS (tools/compile_fused.py).
+- Check 7b6a0653216a434f: PASS 16/16, 1.1511802x. Sliding verify 31.9 / 52.2 /
+  75.5 us (vs 10.5 / 19.3 / 29.8): every CTA recomputes 64 query rows with exact
+  libdevice sin/cos on its critical path. Rejected.
