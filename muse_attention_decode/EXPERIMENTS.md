@@ -700,3 +700,11 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   ea5abace55dd492f: PASS 16/16, 1.4107466x. Sliding decode-1/16/32 16.4/18.7/22.6 us
   (kernel 13.2 us at decode-1) vs 8.4/13.8/16.9 us: still far slower than the PDL Triton
   chain. Fused sliding approach dropped.
+
+## Attempts 45-46 - CUDA full-decode kernel at batch < 8
+
+- attempt45_cuda_decode_b1_chunk512.py / attempt46_cuda_decode_b1_chunk1024.py = attempt 39
+  with the CUDA kernel also below 8 sequences, 512- / 1024-token splits.
+- Checks d307748cda6a430c: 1.5301804x; d7750bf9c1f4462c: 1.5189625x. Full decode-1
+  21.1 / 24.6 us vs 19.3-19.4 us on the Triton kernel (-8.1 / -21.6%): one sequence has
+  too little parallelism for fewer, longer splits. Rejected; batch 1 stays on Triton.
