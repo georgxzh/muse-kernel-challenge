@@ -1,0 +1,67 @@
+okc run 2adb8c73a6fb4747 on muse_moe_w4a16
+submission  /home/georg/muse-kernel-challenge/muse_moe_w4a16/attempts/attempt_12.py
+status      ok
+passed      true
+speedup     1.3371831265443186
+speedup_ci  [1.3171253796461537 1.3572408734424832]
+score_us    10057.336002103877
+tests       5/5 passed
+
+scored shapes (µs; speed of light is the reference's bound)
+case                                                         sglang      yours  speedup        sol  
+bs=1 load=decode 1 sharding=ep8                               78.45      51.72   1.517x      11.42  
+bs=16 load=decode 16 sharding=ep8                            189.02     146.68   1.289x      52.52  
+bs=32 load=decode 32 sharding=ep8                            207.17     199.10   1.041x      70.76  
+bs=8 load=verify 1 sharding=ep8                              143.82     107.69   1.335x      37.32  
+bs=128 load=verify 16 sharding=ep8                           464.02     329.50   1.408x     101.34  
+bs=256 load=verify 32 sharding=ep8                           632.94     423.51   1.495x     108.94  
+
+profile 0: bs=1 load=decode 1 sharding=ep8
+kernel                                                           GPU time  share  calls
+void sglang::device::marlin_moe::Marlin<__nv_bfloat16, 56...      42.3 µs  88.4%      2
+_post_norm_sum                                                     2.8 µs   5.9%      1
+void sglang::act_and_mul_kernel<__nv_bfloat16, (sglang::A...       1.5 µs   3.2%      1
+_align_local_routes                                                1.2 µs   2.5%      1
+total                                                             47.9 µs
+
+profile 1: bs=16 load=decode 16 sharding=ep8
+kernel                                                           GPU time  share  calls
+void sglang::device::marlin_moe::Marlin<__nv_bfloat16, 56...     118.2 µs  94.0%      2
+_post_norm_sum                                                     4.0 µs   3.2%      1
+void sglang::act_and_mul_kernel<__nv_bfloat16, (sglang::A...       2.2 µs   1.7%      1
+_align_local_routes                                                1.4 µs   1.1%      1
+total                                                            125.7 µs
+
+profile 2: bs=32 load=decode 32 sharding=ep8
+kernel                                                           GPU time  share  calls
+void sglang::device::marlin_moe::Marlin<__nv_bfloat16, 56...     220.5 µs  96.6%      2
+_post_norm_sum                                                     3.9 µs   1.7%      1
+void sglang::act_and_mul_kernel<__nv_bfloat16, (sglang::A...       2.3 µs   1.0%      1
+_align_local_routes                                                1.5 µs   0.7%      1
+total                                                            228.3 µs
+
+profile 3: bs=8 load=verify 1 sharding=ep8
+kernel                                                           GPU time  share  calls
+void sglang::device::marlin_moe::Marlin<__nv_bfloat16, 56...      57.3 µs  88.5%      2
+_post_norm_sum                                                     3.8 µs   5.9%      1
+void sglang::act_and_mul_kernel<__nv_bfloat16, (sglang::A...       1.9 µs   3.0%      1
+_align_local_routes                                                1.7 µs   2.6%      1
+total                                                             64.8 µs
+
+profile 4: bs=128 load=verify 16 sharding=ep8
+kernel                                                           GPU time  share  calls
+void sglang::device::marlin_moe::Marlin<__nv_bfloat16, 56...     288.2 µs  81.2%      2
+void sglang::device::marlin_moe::Marlin<__nv_bfloat16, 56...      55.6 µs  15.7%      2
+_post_norm_sum                                                     5.4 µs   1.5%      1
+void sglang::act_and_mul_kernel<__nv_bfloat16, (sglang::A...       3.6 µs   1.0%      1
+_align_mixed_routes                                                1.9 µs   0.5%      1
+total                                                            354.8 µs
+
+profile 5: bs=256 load=verify 32 sharding=ep8
+kernel                                                           GPU time  share  calls
+void sglang::device::marlin_moe::Marlin<__nv_bfloat16, 56...     216.1 µs  56.1%      2
+void sglang::device::marlin_moe::Marlin<__nv_bfloat16, 56...     155.7 µs  40.4%      2
+void sglang::act_and_mul_kernel<__nv_bfloat16, (sglang::A...       5.8 µs   1.5%      1
+_post_norm_sum                                                     4.8 µs   1.2%      1
+_align_mixed_routes                                                2.7 µs   0.7%      1
+total                                                            385.1 µs

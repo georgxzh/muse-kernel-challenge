@@ -19,7 +19,7 @@ Work is confined to this problem on `master`. Other chats share the repository.
   Preserve at least 2 checks. Ask the user before **every** `okc submit`.
 - No local GPU. Local validation is static; correctness/timing use remote checks.
 
-## Attempt 1 — local alignment and fused post norm
+## Attempt 1 ï¿½ local alignment and fused post norm
 
 - Retain supplied SGLang Marlin NVFP4 packing, both W4A16 GEMMs, BF16
   intermediates, and FP32 reduction.
@@ -33,14 +33,14 @@ Work is confined to this problem on `master`. Other chats share the repository.
 - Per-shape SGLang / candidate (us): M1 76.94 / 54.70; M16 195.98 /
   162.95; M32 204.05 / 206.40; M8 146.64 / 116.77; M128 470.19 /
   469.92; M256 634.35 / 634.55.
-- Test relative L2 errors 0.00527–0.00560, safely below 0.015.
-- Profile: GEMMs consume 78–96% of GPU time. Next experiment should tune
+- Test relative L2 errors 0.00527ï¿½0.00560, safely below 0.015.
+- Profile: GEMMs consume 78ï¿½96% of GPU time. Next experiment should tune
   Marlin row blocking. Recommend submitting this known-correct improvement;
   user approval required before running submit.
 - Snapshot: `attempts/attempt_01.py`; profile saved under `profiles/`.
 - Checks spent: 1; remaining: 9. Scored submissions spent: 0.
 
-## Attempt 2 — smaller Marlin row blocks
+## Attempt 2 ï¿½ smaller Marlin row blocks
 
 - Same computation as attempt 1; choose block M=8 for token batches <=32,
   otherwise M=16. Baseline selected 16, 48, 64 at M=32, 128, 256 respectively.
@@ -69,7 +69,7 @@ Work is confined to this problem on `master`. Other chats share the repository.
 - Attempt 1 commit: `7514239`, pushed to `origin/master`. HTTP 408 on initial
   pushes was resolved by `git -c http.postBuffer=524288000 -c http.version=HTTP/1.1 push`.
 
-## Attempt 3 — fused local route alignment
+## Attempt 3 ï¿½ fused local route alignment
 
 - Builds on attempt 2's row blocks, without changing arithmetic.
 - A Triton CTA per local expert reads the route IDs, computes a masked
@@ -290,3 +290,12 @@ Work is confined to this problem on `master`. Other chats share the repository.
   i.e. roughly Marlin parity on M1/M8 and still slower on M16/M32. Beating
   Marlin clearly needs Marlin-grade CUDA, not feasible before the deadline.
 - Recommendation: stop the skinny-kernel line; submission.py stays attempt 6.
+
+## Attempt 12 - Marlin split-K partials in BF16 (rules 2026-11-03)
+
+- attempts/attempt_12.py = scored attempt 6 with use_fp32_reduce=False (Marlin
+  keeps its cross-block split-K partials in BF16; no atomics). SHA256 fe71b17bbb585e53...
+- Check 2adb8c73a6fb4747 (UTC 2026-11-04): PASS, 1.3371831x (scored 1.3617x).
+  vs attempt 6's runs: decode-1 -4.0%, verify-1 -1.4%, verify-16 -4.3%,
+  verify-32 -2.9%, decode-16/32 +0.6/+0.1%. Marlin's BF16 reduce path is slower.
+  Rejected. (Same flag on decode_layer and prefill_layer: also no gain.)
