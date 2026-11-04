@@ -452,3 +452,19 @@ correctness or performance result.
   use_fp32_reduce=False. SHA256 4a2949b683580e04...
 - Check 3ae6428549f741e1: PASS, 1.2665416x (attempt 14: 1.2743x); -0.7% over
   all shapes vs attempt 14. Rejected (moe and prefill show the same).
+
+## Attempt 17: attempt 14 + moe's adaptive 16/32-row Marlin tiles above 128 tokens
+
+- candidate_mixed_tiles.py = candidate_postnorm_b.py (attempt 14) with
+  muse_moe_w4a16 attempt 6's _write_segment/_align_mixed_routes/_align_mixed
+  (verbatim) for T > 128: experts with <= 16 routes get 16-row Marlin tiles,
+  busier experts 32-row tiles; two Marlin calls per GEMM on disjoint rows,
+  SiLU once, the fused post-norm once. T <= 128 unchanged (SGLang alignment,
+  8/16-row tiles). Every route and all arithmetic unchanged.
+- Source SHA256: bc2c8de20e4668740627f2bbe7d8a3debae5200f1a79d4e0766167f0facf49a4
+- Check b9f13135e86f407a (UTC 2026-11-04): PASS 13/13, every recheck, no flags.
+  1.2989604x, score 17414.157 us.
+- vs mean of attempt 14's two runs (7f2f5696, 3ae64285): verify-32 sliding
+  +12.1% (608 -> 534 us), verify-32 full +6.0% (960 -> 882 us); every other
+  shape -0.13% to +1.7% (unchanged code). Verified better than attempt 14 and
+  scored attempt 13. Recommend a scored run of this file (pending approval).
