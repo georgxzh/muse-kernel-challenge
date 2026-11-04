@@ -445,3 +445,10 @@ correctness or performance result.
   +7.5% (geomean). Verified better: recommend a scored run of
   candidate_postnorm_b.py (pending approval). The earlier routing failure did
   not recur (seed-dependent near-tie in the reference's top-8).
+
+## Attempt 16: attempt 14 + Marlin split-K partials in BF16
+
+- candidate_marlin_bf16_reduce.py: candidate_postnorm_b.py with
+  use_fp32_reduce=False. SHA256 4a2949b683580e04...
+- Check 3ae6428549f741e1: PASS, 1.2665416x (attempt 14: 1.2743x); -0.7% over
+  all shapes vs attempt 14. Rejected (moe and prefill show the same).
