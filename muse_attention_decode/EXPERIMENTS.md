@@ -599,4 +599,15 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   into shared memory with cp.async (2 stages, 64 KB per CTA, page-table entries looked
   up one tile further ahead), fragments read from XOR-swizzled shared memory, buffers
   reused for the merge. 168 registers (48 B spill): 3 CTAs x 4 warps per SM.
-  SHA256 e2060334e99b4b92... Check 198506e74d4c4846 pending.
+  SHA256 e2060334e99b4b92... Check 198506e74d4c4846: PASS 16/16, 1.1582827x. Full
+  decode-1 kernel 19.4 us (v1 33.0) but decode-16/32 262.9/670.5 us: each lane staged
+  its own token's row, so every cp.async instruction touched 32 random rows with 16
+  bytes each and L2/DRAM saw scattered 32-byte sector fetches. Rejected.
+
+## Attempt 36 - CUDA kernel v3: coalesced whole-row staging
+
+- candidates/cuda/attn_full_decode_v3.cu in candidates/attempt36_cuda_full_decode_v3.py:
+  v2 with 8 lanes per row in each copy (lane l copies chunk l % 8 of tile row l / 8 + 4i;
+  the row index is shuffled from the lane that looked it up), so each cp.async
+  instruction moves 4 whole 128-byte rows. 168 registers (56 B spill).
+  SHA256 a6564a5ff373ab6b... Check 0f841d54ac6a44b4 pending.
