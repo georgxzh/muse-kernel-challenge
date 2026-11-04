@@ -620,7 +620,12 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 
 - candidates/attempt37_cuda_full_decode_b8.py = attempt 36 with the CUDA kernel only for
   batch >= 8 (2048-token splits); batch 1 keeps the Triton kernel (shape dispatch).
-  SHA256 01bf2a6c8e55fde8... Check 24504aba709d4041 pending.
+  SHA256 01bf2a6c8e55fde8... Check 24504aba709d4041 (UTC 2026-11-04): PASS 16/16,
+  1.5423921x (scored 1.4425x), content_hash f38d6d66be0e03cd. Full decode-16/32
+  122.1/220.9 us (+27.8/+29.8%; changed group +28.8%); full decode-1 back on Triton
+  (19.2 us, -2.0%). Worst shape: decode-1 sliding -4.2% on code identical to attempt
+  17 (attempt 17's own runs differ 2.4% there). Not auto-submitted overnight: that
+  shape is past -3% on a strict reading; attempt 38 (37 + verify kernel) decides.
 
 ## Attempt 38 - CUDA full-layer verify kernel (replaces FA3 for 8+ sequences)
 
