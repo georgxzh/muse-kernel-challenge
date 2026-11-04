@@ -415,3 +415,14 @@
 - Check 21faedff2d0a46ab: PASS, 1.1519654x (scored 1.1571x). Per shape vs the
   scored run: turn-1 -1.3/-1.4%, turn-4 -0.4/-0.6%, first-turn -3.1/+0.6/+1.2/+2.2%
   (the first-turn shapes use DeepGEMM, unchanged). Rejected.
+
+## Attempt 14: moe's fused post-expert norm on the Marlin path
+
+- attempt14_post_norm.py = scored attempt 10 with SGLang's
+  fused_post_expert_norm_weighted_sum replaced by muse_moe_w4a16 attempt 6's
+  _post_norm_sum on the Marlin path (T < 4096), as in muse_decode_layer
+  attempt 14 (which gained 10-20% at small batch). SHA256 55ab3c7d8b76e45c...
+- Check d858d0b98b8c4f48 (UTC 2026-11-04): PASS, 1.1592236x (scored 1.1571x).
+  Changed turn-1/turn-4 shapes -0.25..0.00%: the wrapper's overhead is
+  negligible at 753-3012 tokens. The overall difference is unchanged-shape
+  noise (first-turn, DeepGEMM path). Not verified better; rejected.
