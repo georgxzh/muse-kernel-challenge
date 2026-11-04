@@ -20,7 +20,7 @@ ptxas = Path(triton.__file__).parent / "backends" / "nvidia" / "bin" / "ptxas"
 for page, splits, chunk in ((1, 43, 2048), (1, 336, 256), (64, 43, 2048)):
     const = dict(HQ=16, HK=2, D=64, PAGE=page, PT_STRIDE=86008, SPLITS=splits, CHUNK=chunk, SCALE=0.125, N=mod.PAIR_N)
     k = triton.compile(ASTSource(fn, signature=sig, constexprs=const, attrs=attrs), target=GPUTarget("cuda", 90, 32),
-                       options=dict(num_warps=4, num_stages=2))
+                       options=dict(num_warps=int(os.environ.get("WARPS", 4)), num_stages=int(os.environ.get("STAGES", 2))))
     (d / "pair.ptx").write_text(k.asm["ptx"])
     rep = subprocess.run([str(ptxas), "-v", "--gpu-name=sm_90a", str(d / "pair.ptx"), "-o", str(d / "pair.cubin")], text=True, capture_output=True, check=True).stderr
     sass = k.asm["sass"].splitlines()

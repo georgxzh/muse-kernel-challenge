@@ -519,3 +519,24 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Check 7b6a0653216a434f: PASS 16/16, 1.1511802x. Sliding verify 31.9 / 52.2 /
   75.5 us (vs 10.5 / 19.3 / 29.8): every CTA recomputes 64 query rows with exact
   libdevice sin/cos on its critical path. Rejected.
+
+## Attempts 25-26 - both-heads kernel with 8 warps
+
+- attempt25_pair_w8.py (128-token tiles, 128 regs, 12 B spill) and
+  attempt26_pair_n64_w8.py (64-token tiles, 104 regs): 2 CTAs x 8 warps/SM.
+  Checks c81d85d1190c4917: 1.3503131x; 3dd9d61cb3f64e6f: 1.2646533x. Full decode
+  1/16/32: 22.7/187.6/333.2 and 26.0/232.5/400.8 us (vs 18.8/155.7/284.4).
+  Occupancy is not what holds the both-heads kernel back. Rejected.
+
+## Attempts 27-28 - new precision allowances (rules 2026-11-03)
+
+- attempt27_fp16_partials.py: split-KV partial outputs stored in FP16 (LSE and
+  the combine stay FP32). SHA256 c5d4ad57d9d3a5c0... Check e00e7123bef143b3:
+  PASS 16/16, 1.4340969x; -1.0% over all shapes vs attempt 17's runs (full
+  verify-1 +3.7%, others 0 to -5.7%). Rejected.
+- attempt28_fp16_pv_sliding.py: sliding P.V per tile with FP16 operands and
+  FP16 accumulation (P in [0, 1], FP8 V exact in FP16), FP32 running sum.
+  SHA256 51455157b0fe8a4e... Check 930b2219198b466a: PASS 16/16, 1.4460134x;
+  sliding verify-1/16/32 +6.1/+4.0/+1.6%, but sliding decode-1 -3.4% and
+  decode-32 -12.0%. Fails the -3% rule as is; a verify-only (L > 1) variant
+  could keep the gains (~+0.5% on the board).
