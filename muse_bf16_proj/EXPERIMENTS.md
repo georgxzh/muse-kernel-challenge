@@ -338,4 +338,10 @@ Changed shapes count as one group. A candidate is verified better when the group
   4 chunks in flight per lane; split-K over CTAs (about 1024 CTAs, K ranges >= 256) with
   FP32 partials summed in split order by the last CTA (self-resetting counters). Router and
   m > 16 unchanged. 44 registers, no spills; lane-level emulation (tools/emulate_gemv.py)
-  matches x @ W^T to 6e-14. SHA256 e4bfb416c119233a... Check ef209cbccccd4fd8 pending.
+  matches x @ W^T to 6e-14. SHA256 e4bfb416c119233a...
+- Check ef209cbccccd4fd8 (UTC 2026-11-04): PASS 9/9 (correct on hardware), 1.0782095x.
+  Slower than the Triton tiled kernels on every changed shape: qkv_gate m=1/8/16
+  15.3/16.2/17.2 us vs 12.3/12.5/13.0, pooler 21.7/22.4/23.2 vs 18.2/18.3/18.5, o m=1/16
+  7.6/9.6 vs 6.6/6.6; unpooler m=1 level. The tiled layout streams contiguous 8 KB tiles;
+  this kernel's per-lane 16-byte strided reads split every 128-byte line over two
+  instructions. Rejected.

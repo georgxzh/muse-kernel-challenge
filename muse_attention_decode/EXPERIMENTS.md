@@ -659,3 +659,11 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
   aa0cfed7ad4a7936...) check 84548bb9139f4ea0: PASS 16/16, 1.3533238x. Full
   verify-16/32 324.4/610.9 us: deeper pipelining barely helps; the verify kernel is
   bound by its per-warp softmax/MMA chain (128 query rows per token). Rejected.
+
+## Attempt 41 - 3-stage per-warp ring in the CUDA decode kernel
+
+- candidates/attempt41_cuda_decode_3stage.py = attempt 37 with the decode kernel's ring at
+  3 stages (96 KB per CTA: 2 CTAs per SM instead of 3). SHA256 6eb223fd4941bb3d...
+- Check 4ed0993157134f02: PASS 16/16, 1.5035582x. Full decode-16/32 141.3/238.6 us vs
+  attempt 37/39's 121.9/221.7 us (-13.3/-7.4%): occupancy loss outweighs the deeper
+  ring. Rejected; the 2-stage kernel (attempts 37/39) stays the best.
