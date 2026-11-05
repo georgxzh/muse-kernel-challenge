@@ -4,15 +4,17 @@ My entries for the [Open Kernel Challenge](https://openkernelchallenge.dev): GPU
 
 ## Results
 
-Final scored runs, as a speedup over SGLang on an H200 (higher is better):
+Final scored runs, as a speedup over SGLang on an H200 (higher is better). Ranks as of 2026-11-04 evening:
 
-| Problem | Speedup | Rank | What made the difference |
-|---|---|---|---|
-| muse_attention_decode | **1.44×** | 969 | Custom paged-FP8 attention, PDL launch overlap |
-| muse_moe_w4a16 | **1.36×** | 1037 | Local route alignment, fused post-norm |
-| muse_decode_layer | **1.30×** | — | Reused the attention_decode kernel inside the full layer |
-| muse_bf16_proj | **1.17×** | 1227 | Single-kernel split-K router, BF16 partial sums |
-| muse_prefill_layer | **1.16×** | 686 | Paired FP4 weight decode, short-prefill scheduling |
+| Problem | Speedup | Rank | Scored job | What made the difference |
+|---|---|---|---|---|
+| muse_attention_decode | **1.546×** | 912 | 7d6c77f92723446c | CUDA whole-row full-context decode (B ≥ 8), paged-FP8 Triton kernel, PDL |
+| muse_moe_w4a16 | **1.362×** | 1084 | aa4935c3095c450d | Local route alignment, adaptive 16/32 Marlin tiles, fused post-norm |
+| muse_decode_layer | **1.327×** | 996 | 444f66ab63174de2 | Reused the attention_decode kernels inside the full layer, adaptive Marlin tiles |
+| muse_bf16_proj | **1.199×** | 1124 | 35e70406100a4526 | Single-kernel split-K router, BF16 partial sums |
+| muse_prefill_layer | **1.157×** | 723 | 46d3afde6a5a4ce1 | Paired FP4 weight decode, short-prefill scheduling |
+
+Overall leaderboard rank: **1066**.
 
 Every scored run passed all correctness tests against an FP32/FP64 reference, with no flags.
 
@@ -33,12 +35,18 @@ Every scored run passed all correctness tests against an FP32/FP64 reference, wi
 - **One kernel instead of two.** The router's split-K partial pass plus finish kernel was launch-bound at m ≤ 32; fusing them gave +5–8% per shape.
 - **BF16 partial sums** (allowed by the November rule update): half the split-K traffic.
 - **Exact paired FP4 decode**: two values per packed byte, 32 instead of 56 registers, no spills.
+- **CUDA whole-row decode for full context at B ≥ 8** (attention_decode): +28% on full decode-16/32; ported into decode_layer for +11–14% on those shapes.
+- **Adaptive Marlin tile sizes** (16/32 rows by token count) in MoE and decode_layer: +4.5% on the changed verify shapes.
 
 ## What didn't
 
 - **Fused dequant + grouped GEMM (prefill):** correct but 1.8× slower than expand-then-DeepGEMM; each weight is decoded 5–6 times, once per row tile.
 - **Custom W4A16 MoE GEMM:** about 3× slower than Marlin at 1 token; byte-wise loads cost about 20 instructions per weight.
-- **Second-stream weight expansion, L2 prefetch hints:** within noise.
+- **Second-stream weight expansion, L2 prefetch hints, FP16 partials/PV in attention:** within noise.
+- **Fused sliding-window decode kernel:** 16.4 µs vs 8.4 µs for the Triton path.
+- **CUDA full decode at batch 1:** too little parallelism; -8 to -22% vs Triton.
+- **CUDA GEMV for small projections:** slower than Triton split-K (bf16_proj and decode_layer).
+- **Marlin BF16 reduce path:** -1 to -4% on MoE, decode_layer and prefill.
 
 ## How results were verified
 
