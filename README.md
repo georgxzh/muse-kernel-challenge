@@ -30,15 +30,12 @@ Every number below comes from `okc` (leaderboards and run reports), the per-boar
 Leaderboards fetched with `okc leaderboard <problem> --json` on 2026-11-05 around 14:00 UTC, after the close. CIs come from `okc status <job>`. "Ranked" is the number of teams on the board (the SGLang reference row excluded).
 
 | Board | Speedup vs SGLang | 95% CI | Best scored job | Our time per step | Board leader |
-|---|---:|---|---:|---|---:|---:|
-| muse_attention_decode | **1.546×** | 1.523–1.570 | `7d6c77f92723446c` | 2,435.5 µs | 3.339× |
-| muse_moe_w4a16 | **1.362×** | 1.341–1.382 | `aa4935c3095c450d` | 9,876.5 µs | 2.844× |
-| muse_decode_layer | **1.327×** | 1.307–1.347 |  `444f66ab63174de2` | 17.05 ms | 2.614× |
-| muse_bf16_proj | **1.199×** | 1.181–1.217 | `35e70406100a4526` | 4,028.3 µs | 1.728× |
-| muse_prefill_layer | **1.157×** | 1.140–1.174 | `46d3afde6a5a4ce1` | 334.80 ms | 2.147× |
-| **Overall kernel board** | (ranks only) | | **1,075 / 2,014** | | | |
-
-The organizers' Nov 5 update says these standings are not final: submissions are reviewed and final standings are posted before the serving track opens. The top entries are also rerun on nearby shapes. Our dispatch thresholds are on batch or token counts (B ≥ 8, T > 32, T ≤ 1024, T ≥ 4096), not on exact scored shapes.
+|---|---:|---:|---|---:|---:|
+| `muse_attention_decode` | **1.546×** | 1.523–1.570 | `7d6c77f92723446c` | 2,435.5 µs | 3.339× |
+| `muse_moe_w4a16` | **1.362×** | 1.341–1.382 | `aa4935c3095c450d` | 9,876.5 µs | 2.844× |
+| `muse_decode_layer` | **1.327×** | 1.307–1.347 | `444f66ab63174de2` | 17.05 ms | 2.614× |
+| `muse_bf16_proj` | **1.199×** | 1.181–1.217 | `35e70406100a4526` | 4,028.3 µs | 1.728× |
+| `muse_prefill_layer` | **1.157×** | 1.140–1.174 | `46d3afde6a5a4ce1` | 334.80 ms | 2.147× |
 
 **Why the overall board lists us on 4 problems, not 5.** The overall board only counts the four decode-step problems. `okc show muse_prefill_layer` says: "Prefill isn't part of a decode step, so this problem has its own board and doesn't count toward the overall board." TASK.md describes the overall board as ranking "by how much your best runs together would speed up a decode step". The leaderboard JSON agrees: nobody on the overall board has more than 4 problems (pjmullin3, rank 1, also shows 4). Counting each team's appearances on the four non-prefill boards reproduces the overall board's problem count for 1,988 of 2,014 rows. Counting all five boards matches only 1,118. I did not track down the remaining 26 rows. The exact overall ranking formula is not published (the API returns ranks only).
 
