@@ -708,3 +708,9 @@ Ask the user before EACH scored submit (5/day). Reset is 00:00 UTC.
 - Checks d307748cda6a430c: 1.5301804x; d7750bf9c1f4462c: 1.5189625x. Full decode-1
   21.1 / 24.6 us vs 19.3-19.4 us on the Triton kernel (-8.1 / -21.6%): one sequence has
   too little parallelism for fewer, longer splits. Rejected; batch 1 stays on Triton.
+
+## Final state (boards closed 2026-11-05 07:59 UTC)
+
+- Best scored: attempt 39, candidates/attempt39_cuda_full_decode_b8_remeasure.py (= submission.py,
+  SHA256 42d97020e63fa40f...), job 7d6c77f92723446c: **1.5464x** (95% CI 1.523-1.570), 2,435.5 us.
+- Final board (okc leaderboard --json, 2026-11-05 ~14:00 UTC): rank 926 of 1,379; 6 scored runs.

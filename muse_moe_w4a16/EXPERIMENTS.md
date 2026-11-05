@@ -299,3 +299,10 @@ Work is confined to this problem on `master`. Other chats share the repository.
   vs attempt 6's runs: decode-1 -4.0%, verify-1 -1.4%, verify-16 -4.3%,
   verify-32 -2.9%, decode-16/32 +0.6/+0.1%. Marlin's BF16 reduce path is slower.
   Rejected. (Same flag on decode_layer and prefill_layer: also no gain.)
+
+## Final state (boards closed 2026-11-05 07:59 UTC)
+
+- Best scored: attempt 6, attempts/attempt_06.py (= submission.py, SHA256 941b4566190971a0...),
+  job aa4935c3095c450d: **1.3617x** (95% CI 1.341-1.382), 9,876.5 us.
+- Final board (okc leaderboard --json, 2026-11-05 ~14:00 UTC): rank 1,091 of 1,425; 3 scored runs.
+  Attempts 9-12 (after the selection above) were checks only; none beat attempt 6.

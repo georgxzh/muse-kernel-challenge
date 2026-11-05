@@ -426,3 +426,10 @@
   Changed turn-1/turn-4 shapes -0.25..0.00%: the wrapper's overhead is
   negligible at 753-3012 tokens. The overall difference is unchanged-shape
   noise (first-turn, DeepGEMM path). Not verified better; rejected.
+
+## Final state (boards closed 2026-11-05 07:59 UTC)
+
+- Best scored: attempt 10, attempt10.py (= submission.py, SHA256 c335e88db5c30959...),
+  job 46d3afde6a5a4ce1: **1.1571x** (95% CI 1.140-1.174), 334.80 ms.
+- Final board (okc leaderboard --json, 2026-11-05 ~14:00 UTC): rank 733 of 898; 3 scored runs.
+  This board does not count toward the overall kernel board (okc show muse_prefill_layer).

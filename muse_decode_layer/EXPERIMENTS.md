@@ -526,3 +526,9 @@ correctness or performance result.
 - Check 963bb2ccd251450d: PASS, 1.3041342x (scored attempt 20: 1.3266x). Changed shapes
   decode-1 -2.3/-1.2%, verify-1 -6.1/-7.2%: the CUDA GEMV is slower than the Triton
   split-K GEMMs here too (bf16_proj attempt 17). Rejected.
+
+## Final state (boards closed 2026-11-05 07:59 UTC)
+
+- Best scored: attempt 20, candidate_cuda_full_decode.py (= submission.py, SHA256
+  8b3b01ee8948298d...), job 444f66ab63174de2: **1.3266x** (95% CI 1.307-1.347), 17.05 ms.
+- Final board (okc leaderboard --json, 2026-11-05 ~14:00 UTC): rank 1,004 of 1,299; 8 scored runs.

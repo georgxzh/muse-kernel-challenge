@@ -345,3 +345,10 @@ Changed shapes count as one group. A candidate is verified better when the group
   7.6/9.6 vs 6.6/6.6; unpooler m=1 level. The tiled layout streams contiguous 8 KB tiles;
   this kernel's per-lane 16-byte strided reads split every 128-byte line over two
   instructions. Rejected.
+
+## Final state (boards closed 2026-11-05 07:59 UTC)
+
+- Best scored: attempt 16, attempts/attempt16_bf16_partials.py (= submission.py, SHA256
+  0f205efe3ab0eee7...), job 35e70406100a4526: **1.1992x** (95% CI 1.181-1.217), 4,028.3 us.
+- Final board (okc leaderboard --json, 2026-11-05 ~14:00 UTC): rank 1,137 of 1,746; 7 scored runs.
+  (Attempt 7's scored run, referred to above as 1.1656x, is job 00f6acd41ec2443b per its saved profile.)
