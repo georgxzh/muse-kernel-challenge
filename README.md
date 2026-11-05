@@ -1,7 +1,7 @@
 # Muse Spark Open Kernel Challenge: technical write-up
 
 <p align="left">
-  <img src="kernel-challenge-logo.png" alt="kernel" height="100">
+  <img src="assets/kernel-challenge-logo.png" alt="Kernel Challenge logo" height="100">
 </p>
 
 My entries for the kernel track of the [Open Kernel Challenge](https://openkernelchallenge.dev) (Paradigm with Meta and Andromeda, Oct 22 to Nov 4 2026; the boards closed 2026-11-05 07:59 UTC). Each of the five problems is one piece of Muse Spark Open, a 256-expert MoE model with NVFP4 expert weights, and each submission is a single Python file timed against the SGLang kernel that serves the model today.
