@@ -29,13 +29,13 @@ Every number below comes from `okc` (leaderboards and run reports), the per-boar
 
 Leaderboards fetched with `okc leaderboard <problem> --json` on 2026-11-05 around 14:00 UTC, after the close. CIs come from `okc status <job>`. "Ranked" is the number of teams on the board (the SGLang reference row excluded).
 
-| Board | Speedup vs SGLang | 95% CI | Rank / ranked | Best scored job | Our time per step | Board leader |
+| Board | Speedup vs SGLang | 95% CI | Best scored job | Our time per step | Board leader |
 |---|---:|---|---:|---|---:|---:|
-| muse_attention_decode | **1.546×** | 1.523–1.570 | 926 / 1,379 | `7d6c77f92723446c` | 2,435.5 µs | 3.339× |
-| muse_moe_w4a16 | **1.362×** | 1.341–1.382 | 1,091 / 1,425 | `aa4935c3095c450d` | 9,876.5 µs | 2.844× |
-| muse_decode_layer | **1.327×** | 1.307–1.347 | 1,004 / 1,299 | `444f66ab63174de2` | 17.05 ms | 2.614× |
-| muse_bf16_proj | **1.199×** | 1.181–1.217 | 1,137 / 1,746 | `35e70406100a4526` | 4,028.3 µs | 1.728× |
-| muse_prefill_layer | **1.157×** | 1.140–1.174 | 733 / 898 | `46d3afde6a5a4ce1` | 334.80 ms | 2.147× |
+| muse_attention_decode | **1.546×** | 1.523–1.570 | `7d6c77f92723446c` | 2,435.5 µs | 3.339× |
+| muse_moe_w4a16 | **1.362×** | 1.341–1.382 | `aa4935c3095c450d` | 9,876.5 µs | 2.844× |
+| muse_decode_layer | **1.327×** | 1.307–1.347 |  `444f66ab63174de2` | 17.05 ms | 2.614× |
+| muse_bf16_proj | **1.199×** | 1.181–1.217 | `35e70406100a4526` | 4,028.3 µs | 1.728× |
+| muse_prefill_layer | **1.157×** | 1.140–1.174 | `46d3afde6a5a4ce1` | 334.80 ms | 2.147× |
 | **Overall kernel board** | (ranks only) | | **1,075 / 2,014** | | | |
 
 The organizers' Nov 5 update says these standings are not final: submissions are reviewed and final standings are posted before the serving track opens. The top entries are also rerun on nearby shapes. Our dispatch thresholds are on batch or token counts (B ≥ 8, T > 32, T ≤ 1024, T ≥ 4096), not on exact scored shapes.
